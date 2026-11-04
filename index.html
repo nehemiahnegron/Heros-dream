@@ -106,6 +106,27 @@ body:not(.js) .big{display:none}
 body:not(.js) .mode{display:none}
 .card .row2{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
 .ghostbtn{border:0;background:none;font-weight:800;color:var(--muted);font-size:1.1rem;padding:12px}
+/* hide and seek */
+.mode-hs .star-only,.mode-hs .ctf-only,.mode-hs .no-hs{display:none!important}
+body:not(.mode-hs) .hs-only{display:none!important}
+#hsTop{position:fixed;left:12px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:5;background:var(--pill);color:var(--pill-ink);border-radius:18px;padding:6px 14px 8px;box-shadow:0 3px 0 rgba(42,27,61,.18);max-width:calc(100vw - 190px);backdrop-filter:blur(8px)}
+#hsTimer{font:800 1.8rem/1.05 "Baloo 2",system-ui,sans-serif}
+#hsTimer.hurry{color:#FF2D55;animation:hurry .5s infinite alternate}
+@keyframes hurry{to{transform:scale(1.08)}}
+#hsPhase{font-weight:800;font-size:.95rem;line-height:1.2}
+#hsFound{font-size:.78rem;font-weight:700;opacity:.85;line-height:1.2}
+#hsMeter{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 118px);z-index:5;background:var(--panel);color:var(--panel-ink);border-radius:18px;padding:8px 14px;width:min(330px,92vw);text-align:center;font-weight:800;box-shadow:0 4px 0 rgba(42,27,61,.15)}
+#hsMeter .hc{height:12px;border-radius:12px;background:rgba(110,94,140,.25);overflow:hidden;margin-top:6px}
+#hsHC{display:block;height:100%;width:10%;border-radius:12px;transition:width .3s}
+#hsCross{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);z-index:4;pointer-events:none}
+#hsAct{position:fixed;right:calc(env(safe-area-inset-right,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:6;max-width:62vw;font-size:1.15rem;line-height:1.15}
+#hsView{position:fixed;right:calc(env(safe-area-inset-right,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:6;border:0;border-radius:18px;padding:12px 16px;background:var(--grape);color:#fff;font:800 1.05rem "Baloo 2",system-ui,sans-serif;box-shadow:0 5px 0 var(--grape-deep)}
+#hsCount{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font:800 2.4rem/1.1 "Baloo 2",system-ui,sans-serif;color:#fff;text-shadow:0 4px 0 var(--pink-deep),0 0 24px rgba(42,27,61,.5);z-index:5;pointer-events:none;text-align:center;width:90vw}
+#hsRole{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);transform:translateX(-50%);z-index:7;background:var(--panel);color:var(--panel-ink);border-radius:22px;padding:12px 16px;text-align:center;box-shadow:0 6px 0 rgba(42,27,61,.15);width:min(340px,92vw);font-weight:800}
+#hsRole .row2 button{font-size:1.05rem;padding:10px 16px}
+#hsAct[hidden],#hsView[hidden],#hsMeter[hidden],#hsCount[hidden],#hsRole[hidden],#hsCross[hidden]{display:none!important}
+.mode-hs #toast{top:calc(env(safe-area-inset-top,0px) + 112px)}
+.mode:nth-child(3) b{color:#FF8A3D}
 </style>
 </head>
 <body class="mode-star">
@@ -123,7 +144,7 @@ body:not(.js) .mode{display:none}
 <div id="toast" role="status"></div>
 <div id="joyHint">Drag here<br>to move</div>
 <div id="joy"><div id="knob"></div></div>
-<div id="controls">
+<div id="controls" class="no-hs">
   <button class="act ctf-only" id="ctxBtn" aria-label="Plant flag or call for help">🚩<small>Plant</small></button>
   <button class="act star-only" id="wishBtn" aria-label="Magic necklace wish">💎<small>Wish</small></button>
   <button class="act" id="dashBtn" aria-label="Super dash">💨<small>Dash</small></button>
@@ -144,6 +165,7 @@ body:not(.js) .mode{display:none}
     <div class="modes">
       <button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button>
       <button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button>
+      <button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button>
     </div>
     <p class="needs-js">To play, open this game from a web link in Chrome or Safari.</p>
   </div>
@@ -151,6 +173,13 @@ body:not(.js) .mode{display:none}
 <div id="fade"></div>
 <div id="confetti"></div>
 <div id="redTint"></div>
+<div id="hsTop" class="hs-only"><div id="hsTimer">⏱ 0:45</div><div id="hsPhase"></div><div id="hsFound"></div></div>
+<div id="hsMeter" class="hs-only" hidden><div id="hsFeet"></div><div class="hc"><i id="hsHC"></i></div></div>
+<div id="hsCross" class="hs-only" hidden></div>
+<div id="hsCount" class="hs-only" hidden></div>
+<button class="big hs-only" id="hsAct" hidden></button>
+<button class="hs-only" id="hsView" hidden>👻 Follow the seeker</button>
+<div id="hsRole" class="hs-only" hidden>Next round I want to be:<div class="row2" style="margin-top:8px"><button class="big" data-hsnext="hider">🙈 Hider</button><button class="big" data-hsnext="seeker" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔍 Seeker</button></div></div>
 <div id="count"></div>
 <button class="big" id="readyBtn" hidden>I’m ready! Start the countdown</button>
 
@@ -658,6 +687,401 @@ function endCTF(){
   else showScreen(`<span class="script byline">Capture the Flag</span><h1>It’s a tie!</h1>${sc}<p>Both teams were amazing. Everybody’s a hero today 🩵</p>${btns}`);
 }
 
+/* ---------- hide and seek ---------- */
+const HX=-500;
+const hsGroup=new THREE.Group();hsGroup.position.x=HX;hsGroup.visible=false;scene.add(hsGroup);
+const HS={walls:[[],[]],cols:[[],[]],spots:[],chars:[],phase:"off",wins:{blue:0,red:0},nextRole:"hider",gigs:[],view:"follow"};
+const hsWallM=toon("#FFF3E2"),hsExtM=toon("#F6E7D4");
+function hsAdd(o){hsGroup.add(o);return o}
+function hsBox(w,h,d,mat,x,y,z,parent){const m=M(new THREE.BoxGeometry(w,h,d),mat,x,y,z);(parent||hsGroup).add(m);return m}
+function wallSeg(x1,z1,x2,z2,f,gaps,mat){
+  gaps=(gaps||[]).slice().sort((p,q)=>p[0]-q[0]);mat=mat||hsWallM;
+  const horiz=z1===z2,a=horiz?Math.min(x1,x2):Math.min(z1,z2),b=horiz?Math.max(x1,x2):Math.max(z1,z2),y0=f*4;
+  let cur=a;const pieces=[];gaps.forEach(g=>{if(g[0]>cur)pieces.push([cur,g[0]]);cur=Math.max(cur,g[1])});if(cur<b)pieces.push([cur,b]);
+  pieces.forEach(([p,q])=>{const len=q-p,mid=(p+q)/2;
+    if(horiz){hsBox(len+.3,4,.3,mat,mid,y0+2,z1);HS.walls[f].push({x1:p-.15,x2:q+.15,z1:z1-.15,z2:z1+.15})}
+    else{hsBox(.3,4,len+.3,mat,x1,y0+2,mid);HS.walls[f].push({x1:x1-.15,x2:x1+.15,z1:p-.15,z2:q+.15})}});
+  gaps.forEach(g=>{const len=g[1]-g[0],mid=(g[0]+g[1])/2;if(horiz)hsBox(len,.9,.3,mat,mid,y0+3.55,z1);else hsBox(.3,.9,len,mat,x1,y0+3.55,mid)});
+}
+function floorRect(x1,x2,z1,z2,f,color){const m=M(new THREE.PlaneGeometry(x2-x1,z2-z1),toon(color),(x1+x2)/2,f*4+.03,(z1+z2)/2);m.rotation.x=-PI/2;hsAdd(m)}
+function roomLabel(t,x,z,f){const s=label(t,"#FFFFFF");s.position.set(x,f*4+3.45,z);s.scale.set(2.8,.7,1);hsAdd(s)}
+(function buildHouse(){
+  const lawn=M(new THREE.CircleGeometry(120,48),toon("#8FDB7A"),0,0,15);lawn.rotation.x=-PI/2;hsAdd(lawn);
+  const drive=M(new THREE.PlaneGeometry(7,52),toon("#C9C3CF"),0,.02,40);drive.rotation.x=-PI/2;hsAdd(drive);
+  const road=M(new THREE.PlaneGeometry(160,9),toon("#6E6A78"),0,.03,70.5);road.rotation.x=-PI/2;hsAdd(road);
+  for(let i=0;i<10;i++){const s=M(new THREE.PlaneGeometry(4,.4),basic("#FFE07A"),-72+i*16,.05,70.5);s.rotation.x=-PI/2;hsAdd(s)}
+  // ground floor rooms
+  [[-20,-6,2,14,"#D9A877"],[-6,6,2,14,"#EDE6F5"],[6,20,2,14,"#D9A877"],[-20,-6,-14,2,"#F5F0E6"],[-6,6,-6,2,"#E8DCCB"],[-6,0,-14,-6,"#DDE8F0"],[0,6,-14,-6,"#CFEAF5"],[6,20,-14,2,"#F7C9DE"]].forEach(r=>floorRect(r[0],r[1],r[2],r[3],0,r[4]));
+  // walls ground
+  wallSeg(-20,14,20,14,0,[[-1.5,1.5]],hsExtM);wallSeg(-20,-14,20,-14,0,[[-14,-12]],hsExtM);wallSeg(-20,-14,-20,14,0,null,hsExtM);wallSeg(20,-14,20,14,0,null,hsExtM);
+  wallSeg(-20,2,20,2,0,[[-14,-12],[-3,0],[12,14]]);
+  wallSeg(-6,2,-6,14,0,[[6,10]]);wallSeg(6,2,6,14,0,[[12.3,13.8]]);
+  wallSeg(-6,-14,-6,2,0,[[-3,-1]]);wallSeg(6,-14,6,2,0,[[-3,-1]]);
+  wallSeg(-6,-6,6,-6,0,[[-4,-2],[2,4]]);wallSeg(0,-14,0,-6,0);
+  wallSeg(2,3,2,12,0,null,toon("#E9D7C0"));wallSeg(5.5,3,5.5,12,0,null,toon("#E9D7C0"));wallSeg(2,3,5.5,3,0,null,toon("#E9D7C0"));
+  // upper slab with stair hole
+  const slab=toon("#E8DCCB");hsBox(22,.3,28,slab,-9,3.85,0);hsBox(14.5,.3,28,slab,12.75,3.85,0);hsBox(3.5,.3,17,slab,3.75,3.85,-5.5);hsBox(3.5,.3,2,slab,3.75,3.85,13);
+  // stairs
+  const stepM=toon("#C99A6B");for(let i=0;i<12;i++){const top=(i+1)*4/12,z=12-(i+.5)*.75;hsBox(3.5,top,.75,stepM,3.75,top/2,z)}
+  // upper rooms
+  [[-20,-8,2,14,"#CFE3FF"],[-8,2,2,14,"#E8DCCB"],[5.5,8,2,14,"#E8DCCB"],[2,5.5,12,14,"#E8DCCB"],[2,5.5,2,3,"#E8DCCB"],[8,20,2,14,"#FFE3A8"],[-20,20,-2,2,"#E8DCCB"],[-20,-11,-14,-2,"#D7F5D9"],[-11,-2,-14,-2,"#FFD6EC"],[-2,2,-14,-2,"#CFEAF5"],[2,11,-14,-2,"#E4D7FF"],[11,20,-14,-2,"#FFE0CC"]].forEach(r=>floorRect(r[0],r[1],r[2],r[3],1,r[4]));
+  wallSeg(-20,14,20,14,1,null,hsExtM);wallSeg(-20,-14,20,-14,1,null,hsExtM);wallSeg(-20,-14,-20,14,1,null,hsExtM);wallSeg(20,-14,20,14,1,null,hsExtM);
+  wallSeg(-20,2,-8,2,1,[[-14,-12]]);wallSeg(8,2,20,2,1,[[12,14]]);
+  wallSeg(-8,2,-8,14,1);wallSeg(8,2,8,14,1);
+  wallSeg(-20,-2,20,-2,1,[[-17,-15],[-8,-6],[-1,1],[6,8],[15,17]]);
+  wallSeg(-11,-14,-11,-2,1);wallSeg(-2,-14,-2,-2,1);wallSeg(2,-14,2,-2,1);wallSeg(11,-14,11,-2,1);
+  // stair railings upstairs (low visual, full collision)
+  const railM=toon("#9C6B4A");
+  [[2,3,2,12],[5.5,3,5.5,12],[2,12,5.5,12]].forEach(r=>{const horiz=r[1]===r[3],len=horiz?r[2]-r[0]:r[3]-r[1];hsBox(horiz?len:.12,.12,horiz?.12:len,railM,(r[0]+r[2])/2,5.1,(r[1]+r[3])/2);for(let k=0;k<=len;k+=1){hsBox(.08,1.1,.08,railM,horiz?r[0]+k:r[0],4.55,horiz?r[1]:r[1]+k)}HS.walls[1].push({x1:Math.min(r[0],r[2])-.1,x2:Math.max(r[0],r[2])+.1,z1:Math.min(r[1],r[3])-.1,z2:Math.max(r[1],r[3])+.1})});
+  // roof
+  hsBox(40.6,.3,28.6,toon("#E9D7C0"),0,8.15,0);
+  const roof=M(new THREE.ConeGeometry(1,5,4),toon("#B05A7A"),0,10.8,0);roof.rotation.y=PI/4;roof.scale.set(30,1,21.5);hsAdd(roof);
+  // windows (outside)
+  const win=basic("#9FDFFF");
+  [[-15,14.17],[-9,14.17],[9,14.17],[15,14.17],[-15,-14.17],[-4,-14.17],[9,-14.17],[15,-14.17]].forEach(p=>{[1.9,5.9].forEach(y=>hsBox(2.4,1.6,.06,win,p[0],y,p[1]))});
+  [[-20.17,-8],[-20.17,8],[20.17,-8],[20.17,8]].forEach(p=>{[1.9,5.9].forEach(y=>hsBox(.06,1.6,2.4,win,p[0],y,p[1]))});
+  hsBox(3.6,.4,1.6,toon("#C9C3CF"),0,.2,15);
+  // front door frame
+  hsBox(3.4,.3,.5,toon("#FF5FA8"),0,3.3,14.3);
+  // room labels
+  [["Living Room 1",-13,8,0],["Front Hall",-2,8,0],["Living Room 2",13,8,0],["Kitchen",-13,-4,0],["Hallway",-2,-2,0],["Laundry",-3,-9,0],["Bathroom",3,-9,0],["Bedroom 1",13,-5,0],
+   ["Bedroom 2",-14,7,1],["Loft",-3,7,1],["Bedroom 3",14,7,1],["Bedroom 4",-15.5,-7,1],["Bedroom 5",-6.5,-7,1],["Bathroom",0,-7,1],["Bedroom 6",6.5,-7,1],["Bedroom 7",15.5,-7,1]].forEach(r=>roomLabel(r[0],r[1],r[2],r[3]));
+  // pool
+  const cop=toon("#FFFFFF");hsBox(17,.25,1,cop,0,.12,-20.5);hsBox(17,.25,1,cop,0,.12,-31.5);hsBox(1,.25,12,cop,-8.5,.12,-26);hsBox(1,.25,12,cop,8.5,.12,-26);
+  const water=M(new THREE.PlaneGeometry(16,10),basic("#5CC8FF"),0,.08,-26);water.rotation.x=-PI/2;hsAdd(water);HS.water=water;
+  HS.cols[0].push({x1:-9,x2:9,z1:-32,z2:-20});
+  const ring=M(new THREE.TorusGeometry(.6,.2,8,20),basic("#FF5FA8"),3,.25,-25);ring.rotation.x=PI/2;hsAdd(ring);HS.ring=ring;
+  const yl=label("Backyard & Pool","#CDEFFF");yl.position.set(0,4,-34);yl.scale.set(4.5,1.1,1);hsAdd(yl);
+  // trees
+  for(let i=0;i<30;i++){const a=i/30*PI*2,r=48+Math.random()*10;const x=Math.cos(a)*r,z=Math.sin(a)*r+5;if(Math.abs(x)<7&&z>20)continue;const g=new THREE.Group();g.add(M(cyl(.35,.45,2.4,8),trunkM,0,1.2,0));g.add(M(new THREE.ConeGeometry(1.8,3.4,10),leafMs[i%3],0,3.8,0));g.add(M(new THREE.ConeGeometry(1.3,2.6,10),leafMs[0],0,5.4,0));g.position.set(x,0,z);g.scale.setScalar(1.5);hsAdd(g)}
+})();
+// van
+(function(){
+  const v=new THREE.Group(),white=toon("#F4F4F8"),glass=new THREE.MeshBasicMaterial({color:"#2A3B5C",transparent:true,opacity:.35,side:THREE.DoubleSide,depthWrite:false});
+  v.add(M(new THREE.BoxGeometry(2.5,1.3,6.2),white,0,1.15,0));
+  v.add(M(new THREE.BoxGeometry(2.5,1,6.0),glass,0,2.3,.05));
+  v.add(M(new THREE.BoxGeometry(2.55,.16,6.25),white,0,2.86,0));
+  [[-1.2,-2.95],[1.2,-2.95],[-1.2,2.95],[1.2,2.95]].forEach(p=>v.add(M(new THREE.BoxGeometry(.12,1,.12),white,p[0],2.3,p[1])));
+  v.add(M(new THREE.BoxGeometry(2.56,.22,6.24),toon("#FF5FA8"),0,1.25,0));
+  [[-.8,-3.11],[.8,-3.11]].forEach(p=>v.add(M(new THREE.BoxGeometry(.5,.25,.05),basic("#FFF2A8"),p[0],1.3,p[1])));
+  HS.wheels=[];[[-1.25,-2.1],[1.25,-2.1],[-1.25,2.1],[1.25,2.1]].forEach(p=>{const w=M(cyl(.48,.48,.35,16),toon("#2A1B3D"),p[0],.48,p[1]);w.rotation.z=PI/2;v.add(w);HS.wheels.push(w)});
+  v.add(M(new THREE.BoxGeometry(2.3,.5,.6),toon("#3A3550"),0,1.95,-2.55));
+  const sw=M(new THREE.TorusGeometry(.22,.04,8,20),toon("#2A1B3D"),-.55,2.15,-2.15);sw.rotation.x=-.5;v.add(sw);
+  const seatM=toon("#5B6B8C");[-1.4,0,1.5].forEach((z,i)=>{[-.6,.6].forEach(x=>{v.add(M(new THREE.BoxGeometry(.8,.45,.8),seatM,x,1.6,z));v.add(M(new THREE.BoxGeometry(.8,.9,.15),seatM,x,2.05,z+.4))})});
+  const t=label("🚐","#FFFFFF");t.position.set(0,3.6,0);t.scale.set(1.6,.4,1);
+  v.position.set(0,0,70);hsAdd(v);HS.van=v;
+  HS.cols[0].push({x1:-1.3,x2:1.3,z1:23,z2:29,van:true});
+})();
+
+/* nav graph */
+const NODES={van:[2.6,24.5,0],front:[0,17,0],fdoor:[0,14,0],foyer:[-2,11,0],stairBot:[3.75,13,0],dLivA:[-6,8,0],livA:[-13,8,0],dLivB:[6,13,0],livB:[13,8,0],
+  dFH:[-1.5,2,0],hall:[-2,-2,0],dLK:[-13,2,0],kitchen:[-10,-3,0],dLB:[13,2,0],bed1:[13,-6,0],dKH:[-6,-2,0],dHB:[6,-2,0],dLau:[-3,-6,0],laundry:[-3,-10,0],dBa1:[3,-6,0],bath1:[3,-10,0],
+  dBack:[-13,-14,0],backOut:[-13,-16.5,0],yardN:[0,-17.5,0],yardE:[13,-20,0],yardSE:[13,-35,0],yardS:[0,-35,0],yardSW:[-14,-35,0],yardW:[-14,-24,0],
+  sideW1:[-24,17,0],sideW2:[-24,-17,0],sideE1:[24,17,0],sideE2:[24,-17,0],
+  stairTop:[3.75,2.4,1],c4:[0,0,1],loft:[-3,8,1],c1:[-16,0,1],c2:[-13,0,1],c3:[-7,0,1],c5:[7,0,1],c6:[13,0,1],c7:[16,0,1],
+  dB2:[-13,2,1],bed2:[-14,8,1],dB3:[13,2,1],bed3:[14,8,1],dB4:[-16,-2,1],bed4:[-15.5,-8,1],dB5:[-7,-2,1],bed5:[-6.5,-7,1],dBa2:[0,-2,1],bath2:[0,-8,1],dB6:[7,-2,1],bed6:[6.5,-7,1],dB7:[16,-2,1],bed7:[15.5,-8,1]};
+const ADJ={};Object.keys(NODES).forEach(k=>ADJ[k]=[]);
+"van-front front-fdoor fdoor-foyer foyer-stairBot foyer-dLivA dLivA-livA stairBot-dLivB dLivB-livB foyer-dFH dFH-hall livA-dLK dLK-kitchen livB-dLB dLB-bed1 hall-dKH dKH-kitchen hall-dHB dHB-bed1 hall-dLau dLau-laundry hall-dBa1 dBa1-bath1 kitchen-dBack dBack-backOut backOut-yardN yardN-yardE yardE-yardSE yardSE-yardS yardS-yardSW yardSW-yardW yardW-backOut front-sideW1 sideW1-sideW2 sideW2-yardW front-sideE1 sideE1-sideE2 sideE2-yardE stairBot-stairTop stairTop-c4 c4-loft c4-c3 c3-c2 c2-c1 c4-c5 c5-c6 c6-c7 c2-dB2 dB2-bed2 c6-dB3 dB3-bed3 c1-dB4 dB4-bed4 c3-dB5 dB5-bed5 c4-dBa2 dBa2-bath2 c5-dB6 dB6-bed6 c7-dB7 dB7-bed7".split(" ").forEach(e=>{const [a,b]=e.split("-");ADJ[a].push(b);ADJ[b].push(a)});
+function segHits(ax,az,bx,bz,b){let t0=0,t1=1;const dx=bx-ax,dz=bz-az,p=[-dx,dx,-dz,dz],q=[ax-b.x1,b.x2-ax,az-b.z1,b.z2-az];for(let i=0;i<4;i++){if(p[i]===0){if(q[i]<0)return false}else{const r=q[i]/p[i];if(p[i]<0){if(r>t1)return false;if(r>t0)t0=r}else{if(r<t0)return false;if(r<t1)t1=r}}}return true}
+function los(ax,az,bx,bz,f){return !HS.walls[f].some(w=>segHits(ax,az,bx,bz,w))}
+function nearestNode(x,z,f){let best=null,bd=1e9,fb=null,fbd=1e9;for(const k in NODES){const n=NODES[k];if(n[2]!==f)continue;const d=Math.hypot(n[0]-x,n[1]-z);if(d<fbd){fbd=d;fb=k}if(d<bd&&los(x,z,n[0],n[1],f)){bd=d;best=k}}return best||fb}
+function bfs(a,b){if(a===b)return [a];const prev={[a]:null},q=[a];while(q.length){const c=q.shift();for(const n of ADJ[c]){if(n in prev)continue;prev[n]=c;if(n===b){const out=[b];let k=c;while(k){out.unshift(k);k=prev[k]}return out}q.push(n)}}return [b]}
+function navTo(ch,node,extra){const p=ch.c.position;const start=nearestNode(p.x,p.z,ch.f);ch.path=bfs(start,node).map(k=>({x:NODES[k][0],z:NODES[k][1]})).concat(extra||[])}
+function inStairs(x,z){return x>2&&x<5.5&&z>3&&z<12}
+function settleY(e){const p=e.c.position;if(inStairs(p.x,p.z)){const y=Math.max(0,Math.min(4,4*(12-p.z)/9));e.f=y>2?1:0;return y}return e.f*4}
+function hsCollide(e,r){const p=e.c.position,f=e.f;
+  const lists=[HS.walls[f],HS.cols[f]];
+  for(const L of lists)for(const b of L){if(b.van&&HS.phase==="intro")continue;if(p.x>b.x1-r&&p.x<b.x2+r&&p.z>b.z1-r&&p.z<b.z2+r){const l=p.x-(b.x1-r),rr=(b.x2+r)-p.x,fr=p.z-(b.z1-r),bk=(b.z2+r)-p.z,m=Math.min(l,rr,fr,bk);if(m===l)p.x=b.x1-r;else if(m===rr)p.x=b.x2+r;else if(m===fr)p.z=b.z1-r;else p.z=b.z2+r}}
+  p.x=Math.max(-32,Math.min(32,p.x));p.z=Math.max(-42,Math.min(66,p.z));
+}
+function hsStep(e,dx,dz){const p=e.c.position;p.x+=dx;p.z+=dz;hsCollide(e,.35);p.y=settleY(e)}
+function walkTo(e,tx,tz,sp,dt){const p=e.c.position,dx=tx-p.x,dz=tz-p.z,d=Math.hypot(dx,dz);if(d<.01)return 0;const s=Math.min(d,sp*dt);const bx=p.x,bz=p.z;hsStep(e,dx/d*s,dz/d*s);e.c.rotation.y=lerpAngle(e.c.rotation.y,Math.atan2(dx,dz),10*dt);
+  const moved=Math.hypot(p.x-bx,p.z-bz);if(moved<s*.3){e.stuck=(e.stuck||0)+dt;if(e.stuck>.8){p.x+=dx/d*Math.min(d,.6);p.z+=dz/d*Math.min(d,.6);p.y=settleY(e);e.stuck=0}}else e.stuck=0;
+  return Math.hypot(tx-p.x,tz-p.z)}
+
+/* hiding spots */
+const SPOT_DEFS=[
+ ["livA","couch","behind","couch",0,-13,12.6,180],["livA","toy chest","in","chest",0,-18.9,4,90],["livA","TV cabinet","in","cabinet",0,-19.2,10,90],
+ ["foyer","coat closet","in","wardrobe",0,-4.6,13.4,180],["foyer","door under the stairs","in","stairdoor",0,1.8,7,-90],["foyer","big plant","behind","plant",0,-5.2,3.2,90],
+ ["livB","sofa","behind","couch",0,18.6,8,-90],["livB","piano","under","piano",0,10,12.9,180],["livB","moving boxes","in","boxes",0,16,13,180],
+ ["kitchen","fridge","in","fridge",0,-19.3,-1,90],["kitchen","pantry","in","wardrobe",0,-19.3,-9,90],["kitchen","kitchen island","behind","island",0,-15,-6,0],["kitchen","cabinet under the sink","in","cabinet",0,-9,-13.4,0],
+ ["hall","storage boxes","in","boxes",0,4.6,1.2,180],
+ ["laundry","washing machine","in","washer",0,-5.35,-12.8,90],["laundry","dryer","in","washer",0,-5.35,-11.4,90],["laundry","laundry basket","in","basket",0,-1,-13,0],
+ ["bath1","bathtub","behind","tub",0,3,-13.1,0],["bath1","towel cabinet","in","cabinet",0,5.35,-8.5,-90],
+ ["bed1","bed","under","bed",0,16,-10,0],["bed1","wardrobe","in","wardrobe",0,19.35,-4,-90],["bed1","toy box","in","chest",0,8,-13.3,0],
+ ["bed2","bed","under","bed",1,-16,11,180],["bed2","wardrobe","in","wardrobe",1,-19.35,5,90],["bed2","boxes","in","boxes",1,-9.5,12.9,180],
+ ["loft","bean bags","behind","beanbag",1,-6.6,12.6,180],["loft","toy tent","in","tent",1,-6.4,4.2,0],["loft","bookshelf","behind","shelf",1,6.8,13.4,180],
+ ["bed3","bed","under","bed",1,16,11,180],["bed3","wardrobe","in","wardrobe",1,19.35,5,-90],["bed3","giant teddy bear","behind","teddy",1,9.4,12.6,180],
+ ["bed4","bed","under","bed",1,-16.5,-11.5,0],["bed4","wardrobe","in","wardrobe",1,-11.6,-11.5,-90],
+ ["bed5","bunk bed","under","bed",1,-6.5,-12,0],["bed5","toy chest","in","chest",1,-2.8,-3.6,-90],
+ ["bath2","shower","behind","tub",1,0,-13.1,0],
+ ["bed6","bed","under","bed",1,6.5,-11.5,0],["bed6","wardrobe","in","wardrobe",1,10.35,-6,-90],
+ ["bed7","bed","under","bed",1,16,-11.5,0],["bed7","wardrobe","in","wardrobe",1,19.35,-6,-90],["bed7","boxes","in","boxes",1,12.2,-13,0],
+ ["yardE","pool shed","in","shed",0,17,-26,-90],["yardW","bush","behind","bush",0,-19,-29,90],["yardW","lounge chair","under","lounge",0,-11,-25,90],
+ ["yardN","pool toy bin","in","bin",0,10,-17,0],["backOut","grill","behind","grill",0,-17,-18.5,90],["yardSE","doghouse","in","doghouse",0,17,-35,-90],["front","trash cans","behind","trash",0,-7,15.3,0]];
+const SPOT_SIZE={wardrobe:[1.8,3,.9],couch:[2.8,1.1,1.1],chest:[1.3,.8,.8],cabinet:[1.4,1.2,.7],stairdoor:[1,2.2,.1],plant:[1,2.2,1],piano:[2.2,1.4,1],boxes:[2.1,1.9,1],fridge:[1.2,2.6,1],island:[2.4,1.1,1.2],washer:[1,1.1,.9],basket:[1,.7,1],tub:[3.2,.7,1.3],bed:[2,.75,3],beanbag:[1.8,1,1.2],tent:[1.6,2,1.6],shelf:[2,2.6,.5],teddy:[1.6,2.4,1.2],shed:[3,2.8,2.6],bush:[2.4,1.6,1.6],lounge:[.9,.6,2.2],bin:[1.4,.9,.9],grill:[1.2,1.2,.7],doghouse:[1.6,1.6,1.8],trash:[1.8,1.2,.8]};
+const WOOD="#B5835A";
+function buildSpot(type,w,h,d,parts){
+  const g=new THREE.Group();const B=(bw,bh,bd,c,x,y,z,par)=>{const m=M(new THREE.BoxGeometry(bw,bh,bd),typeof c==="string"?toon(c):c,x,y,z);(par||g).add(m);return m};
+  const door=(px,dir,pw,ph,c,y)=>{const pv=new THREE.Group();pv.position.set(px,0,d/2);g.add(pv);B(pw,ph,.08,c,-dir*pw/2,y,.04,pv);B(.08,.25,.12,"#FFC23C",-dir*(pw-.15),y,.12,pv);parts.doors.push({p:pv,dir});return pv};
+  switch(type){
+    case"wardrobe":B(w,h,d,WOOD,0,h/2,0);B(w+.1,.15,d+.1,"#9C6B4A",0,h+.07,0);door(-w/2,-1,w/2-.02,h-.2,"#C99A6B",h/2);door(w/2,1,w/2-.02,h-.2,"#C99A6B",h/2);break;
+    case"couch":{const c=["#8E6CFF","#FF8FC4","#3FA7E8"][Math.floor(Math.random()*3)];B(w,.5,d,c,0,.45,0);B(w,1.1,.3,c,0,.75,-d/2+.15);B(.3,.75,d,c,-w/2+.15,.55,0);B(.3,.75,d,c,w/2-.15,.55,0);B(.9,.18,.8,shade(c,.12),-.6,.78,.1);B(.9,.18,.8,shade(c,.12),.6,.78,.1);break}
+    case"chest":B(w,h*.8,d,"#E8A33D",0,h*.4,0);{const pv=new THREE.Group();pv.position.set(0,h*.8,-d/2);g.add(pv);B(w,.18,d,"#C97F22",0,.09,d/2,pv);parts.lid=pv}B(.2,.25,.06,"#FFE07A",0,h*.7,d/2+.02);break;
+    case"cabinet":B(w,h,d,"#FFFFFF",0,h/2,0);B(w+.05,.08,d+.05,"#B8B0C8",0,h+.04,0);door(-w/2,-1,w-.04,h-.15,"#EDE6F5",h/2);break;
+    case"stairdoor":door(w/2,1,w,h,"#C99A6B",h/2);break;
+    case"plant":g.add(M(cyl(.4,.3,.6,12),toon("#E8A33D"),0,.3,0));g.add(M(sph(.7,12,10),toon("#4DBF6A"),0,1.3,0));g.add(M(sph(.5,12,10),toon("#6ED07E"),.2,1.9,.1));break;
+    case"piano":B(w,.5,d,"#2A1B3D",0,1.1,0);B(w,.9,.3,"#2A1B3D",0,1.7,-d/2+.15);B(w-.2,.06,.3,"#FFFFFF",0,1.37,d/2-.2);[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(s=>B(.12,.85,.12,"#2A1B3D",s[0]*(w/2-.15),.43,s[1]*(d/2-.15)));break;
+    case"boxes":B(1,1,1,"#D9A877",-.55,.5,0);B(1,1,1,"#C99A6B",.55,.5,0);B(.9,.9,.9,"#E0B184",.1,1.45,0);B(1.02,.08,.12,"#F3E3B5",-.55,1.01,0);{const pv=new THREE.Group();pv.position.set(.55,1,.5);g.add(pv);B(1,.05,.5,"#B8875B",0,.02,-.25,pv);parts.lid=pv}break;
+    case"fridge":B(w,h,d,"#F2F5FA",0,h/2,0);door(-w/2,-1,w-.02,h-.1,"#FFFFFF",h/2);B(.06,.06,.06,"#FF5FA8",.2,2,d/2+.1);break;
+    case"island":B(w,h,d,"#7FD3FF",0,h/2,0);B(w+.2,.1,d+.2,"#FFFFFF",0,h+.05,0);break;
+    case"washer":B(w,h,d,"#FFFFFF",0,h/2,0);B(w,.12,.25,"#B8B0C8",0,h-.06,-d/2+.15);{const pv=new THREE.Group();pv.position.set(-.3,0,d/2);g.add(pv);const c=M(new THREE.CircleGeometry(.3,24),basic("#5C6B8C"),.3,.5,.02);pv.add(c);const r=M(new THREE.TorusGeometry(.3,.04,6,20),toon("#B8B0C8"),.3,.5,.04);pv.add(r);parts.doors.push({p:pv,dir:-1})}break;
+    case"basket":g.add(M(cyl(.5,.42,.7,14),toon("#D9A877"),0,.35,0));{const pv=new THREE.Group();pv.position.set(0,.72,-.5);g.add(pv);pv.add(M(cyl(.52,.52,.08,14),toon("#C99A6B"),0,0,.5));parts.lid=pv}break;
+    case"tub":B(w,h,d,"#FFFFFF",0,h/2,0);B(w-.3,.05,d-.3,"#9FDFFF",0,h-.02,0);g.add(M(cyl(.03,.03,w,6),toon("#B8B0C8"),0,2.3,d/2)).rotation.z=PI/2;{const cu=M(new THREE.PlaneGeometry(w,1.9),basic("#FF8FC4",{side:THREE.DoubleSide,transparent:true,opacity:.92}),0,1.35,d/2);g.add(cu);parts.curtain=cu}break;
+    case"bed":{const c=["#FF8FC4","#7FD3FF","#B9A6FF","#FFE07A","#8CE8B9"][Math.floor(Math.random()*5)];[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(s=>B(.15,.35,.15,"#9C6B4A",s[0]*(w/2-.1),.17,s[1]*(d/2-.1)));B(w,.3,d,"#9C6B4A",0,.45,0);B(w-.1,.25,d-.1,"#FFFFFF",0,.72,0);B(w,.12,d*.62,c,0,.88,d*.18);B(w*.7,.2,.5,"#FFFFFF",0,.92,-d/2+.4);B(w,1.4,.15,"#9C6B4A",0,.7,-d/2);B(w+.04,.35,d*.62,c,0,.62,d*.18).scale.set(1,1,1);break}
+    case"beanbag":g.add(M(sph(.6,12,10),toon("#FF8FC4"),-.45,.4,0)).scale.y=.7;g.add(M(sph(.6,12,10),toon("#7FD3FF"),.45,.4,0)).scale.y=.7;break;
+    case"tent":{const t=M(new THREE.ConeGeometry(.95,2,4),toon("#FFE07A"),0,1,0);t.rotation.y=PI/4;g.add(t);B(.6,1,.05,"#2A1B3D",0,.5,.55);break}
+    case"shelf":B(w,h,d,WOOD,0,h/2,0);for(let r=0;r<4;r++)for(let i=0;i<7;i++)B(.18,.45,.3,["#FF5FA8","#3FA7E8","#FFC23C","#2BCB8B","#8E6CFF"][(i+r)%5],-w/2+.25+i*.26,.45+r*.6,.12);break;
+    case"teddy":g.add(M(sph(.75,14,12),toon("#B07A50"),0,.8,0));g.add(M(sph(.5,14,12),toon("#B07A50"),0,1.85,0));[-1,1].forEach(s=>{g.add(M(sph(.18,10,8),toon("#B07A50"),s*.35,2.25,0));g.add(M(sph(.07,8,6),basic("#2A1B3D"),s*.17,1.95,.45))});g.add(M(sph(.16,10,8),toon("#E8C9A0"),0,1.75,.45));break;
+    case"shed":B(w,h,d,"#7FBF8A",0,h/2,0);{const r=M(new THREE.ConeGeometry(2.3,1.2,4),toon("#B05A7A"),0,h+.6,0);r.rotation.y=PI/4;r.scale.set(1,1,.9);g.add(r)}door(-.7,-1,1.4,2.2,"#5E9E6A",1.1);break;
+    case"bush":[[-.6,.7,0,.9],[.5,.7,.1,.85],[0,1.1,-.1,.8]].forEach(b=>g.add(M(sph(b[3],12,10),toon("#4DBF6A"),b[0],b[1],b[2])));break;
+    case"lounge":B(w,.15,d,"#FFFFFF",0,.45,0);{const back=B(w,.15,.9,"#FFFFFF",0,.75,-d/2+.35);back.rotation.x=-.9}[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(s=>B(.08,.45,.08,"#B8B0C8",s[0]*(w/2-.05),.22,s[1]*(d/2-.1)));B(w-.1,.06,d-.3,"#FF8FC4",0,.55,.1);break;
+    case"bin":B(w,h,d,"#3FA7E8",0,h/2,0);{const pv=new THREE.Group();pv.position.set(0,h,-d/2);g.add(pv);B(w+.06,.1,d+.06,"#2577AE",0,.05,d/2,pv);parts.lid=pv}break;
+    case"grill":B(w,.7,d,"#2A1B3D",0,.95,0);[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(s=>B(.08,.6,.08,"#5C6B8C",s[0]*(w/2-.1),.3,s[1]*(d/2-.1)));break;
+    case"doghouse":B(w,1.1,d,"#E8A33D",0,.55,0);{const r=M(new THREE.ConeGeometry(1.3,.8,4),toon("#B05A7A"),0,1.5,0);r.rotation.y=PI/4;g.add(r)}B(.6,.7,.04,"#2A1B3D",0,.4,d/2+.01);break;
+    case"trash":g.add(M(cyl(.38,.34,1.1,12),toon("#5C6B8C"),-.45,.55,0));g.add(M(cyl(.38,.34,1.1,12),toon("#2BCB8B"),.45,.55,0));break;
+  }
+  return g;
+}
+SPOT_DEFS.forEach(d=>{
+  const [n,name,verb,type,f,x,z,rotDeg]=d,sz=SPOT_SIZE[type],r=rotDeg*PI/180,fx=Math.sin(r),fz=Math.cos(r);
+  const parts={doors:[]},g=buildSpot(type,sz[0],sz[1],sz[2],parts);g.position.set(x,f*4,z);g.rotation.y=r;hsAdd(g);
+  const s={n,name,verb,type,f,x,z,fx,fz,w:sz[0],h:sz[1],d:sz[2],g,parts,open:0,openTarget:0,occupant:null,checked:false};
+  s.ax=x+fx*(sz[2]/2+.8);s.az=z+fz*(sz[2]/2+.8);
+  if(type==="stairdoor"){s.hx=x-fx*1.2;s.hz=z-fz*1.2}else if(verb==="behind"&&type!=="tub"){s.hx=x-fx*(sz[2]/2+.45);s.hz=z-fz*(sz[2]/2+.45)}else{s.hx=x;s.hz=z}
+  s.reach=Math.max(sz[0],sz[2])/2+2.3;
+  if(type!=="stairdoor"){const sw=Math.abs(fx)>.5?sz[2]:sz[0],sd=Math.abs(fx)>.5?sz[0]:sz[2];HS.cols[f].push({x1:x-sw/2+.05,x2:x+sw/2-.05,z1:z-sd/2+.05,z2:z+sd/2-.05})}
+  HS.spots.push(s);
+});
+const glowM=new THREE.MeshBasicMaterial({color:"#FFE07A",transparent:true,opacity:.4,depthTest:false,depthWrite:false});
+HS.glow=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),glowM);HS.glow.renderOrder=999;HS.glow.visible=false;hsAdd(HS.glow);
+function spotVerb(s,seek){if(seek)return s.verb==="under"?"Look under":s.verb==="behind"?"Look behind":"Open";return s.verb==="under"?"Hide under":s.verb==="behind"?"Hide behind":"Hide in"}
+function animSpot(s,dt){s.open+=(s.openTarget-s.open)*Math.min(1,dt*7);const o=s.open;
+  s.parts.doors.forEach(d=>d.p.rotation.y=d.dir*-1.7*o);if(s.parts.lid)s.parts.lid.rotation.x=-1.2*o;if(s.parts.curtain){s.parts.curtain.scale.x=1-.75*o;s.parts.curtain.position.x=-s.w*.375*o}
+  if(!s.parts.doors.length&&!s.parts.lid&&!s.parts.curtain)s.g.rotation.z=Math.sin(nowT*30)*.04*o;}
+
+/* players */
+const HS_ROSTER=[
+  {name:"Leaha",team:"blue",player:true},
+  {name:"Cardi B",team:"blue",look:Object.assign({},CARDI,{shirtDot:null})},
+  {name:"Mom",team:"blue",look:{skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",eyes:"happy",scale:1.1}},
+  {name:"Dad",team:"blue",look:{skin:"#C68642",hair:"none",hairColor:"#2B1B12",eyes:"round",scale:1.15}},
+  {name:"Lora",team:"red",look:{skin:"#F6D5BE",hair:"bun",hairColor:"#F4D06F",eyes:"round"}},
+  {name:"Eloise",team:"red",look:{skin:"#E8B48C",hair:"pigtails",hairColor:"#2B1B12",eyes:"happy",scale:.85}},
+  {name:"Nana",team:"red",look:{skin:"#E8B48C",hair:"bun",hairColor:"#DADAE6",eyes:"happy",glasses:true,outfit:"dress",scale:1.05}},
+  {name:"Titi Sam",team:"red",look:{skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",eyes:"sparkle",scale:1.1}}];
+HS_ROSTER.forEach(r=>{
+  let c;if(r.player)c=hero;else{c=makeChar(Object.assign({outfit:"hoodie"},r.look,{outfitColor:TEAM[r.team].color}));const l=label(r.name+(r.team==="blue"?" 🔵":" 🔴"),TEAM[r.team].label);l.position.y=3.1*(r.look.scale||1)+.3;l.scale.set(3,.75,1);c.add(l);hsAdd(c)}
+  HS.chars.push({c,name:r.name,team:r.team,isPlayer:!!r.player,f:0,path:[],speed:5});
+});
+const HP=HS.chars[0];
+
+/* round flow */
+function hsPrep(){
+  HS.phase="menu";HS.van.position.z=70;
+  HS.chars.forEach(ch=>{if(!ch.isPlayer){ch.c.visible=false;ch.c.position.set(0,0,70)}});
+}
+function hsStart(role){
+  audioOn();HS.nextRole=role;$("#screen").hidden=true;$("#hsRole").hidden=true;
+  Object.assign(HS,{phase:"intro",introT:0,timer:45,lastTick:99,found:{own:0,enemy:0},gigT:6,view:"follow",pmode:"intro",cut:null,searchT:0,mySpot:null});
+  HS.gigs.forEach(g=>hsGroup.remove(g.s));HS.gigs=[];
+  HS.spots.forEach(s=>{s.occupant=null;s.reserved=null;s.checked=false;s.open=0;s.openTarget=0;animSpot(s,0)});
+  HS.glow.visible=false;
+  const others=HS.chars.filter(c=>!c.isPlayer);
+  HS.seeker=role==="seeker"?HP:others[Math.floor(Math.random()*others.length)];
+  HS.chars.forEach((ch,i)=>{ch.path=[];ch.anim=null;ch.onArrive=null;ch.state="van";ch.f=0;ch.spot=null;ch.c.visible=false;ch.c.rotation.set(0,PI,0);ch.c.position.set(2.4,0,25+i*.3);ch.searchT=0});
+  hero.visible=false;
+  G.fpYaw=0;G.fpPitch=0;G.playing=true;G.over=false;
+  toast(`🚐 Here we are! ${HS.seeker.isPlayer?"You are the seeker":HS.seeker.name+" is the seeker"} (${HS.seeker.team==="blue"?"🔵 blue":"🔴 red"} team).`,3600);
+}
+function beginHide(){
+  HS.phase="hide";HS.timer=45;HS.lastTick=99;HS.van.position.z=26;HS.seeker.c.visible=false;
+  const hiders=HS.chars.filter(c=>c!==HS.seeker);
+  const free=HS.spots.slice().sort(()=>Math.random()-.5);
+  hiders.forEach((ch,i)=>{
+    ch.c.position.set(2.6+(i%3)*.5,0,24+Math.floor(i/3)*.8);ch.c.rotation.y=PI;ch.f=0;
+    if(ch.isPlayer){HS.pmode="fp";hero.visible=false;G.fpYaw=0;G.fpPitch=-.05;return}
+    ch.c.visible=true;ch.speed=4.2+Math.random()*1.2;
+    const s=free.find(s=>!s.reserved);s.reserved=ch;ch.spot=s;ch.state="toSpot";
+    navTo(ch,s.n,[{x:s.ax,z:s.az}]);ch.onArrive=()=>{if(s.occupant){const alt=HS.spots.find(q=>!q.occupant&&!q.reserved);if(alt){alt.reserved=ch;ch.spot=alt;navTo(ch,alt.n,[{x:alt.ax,z:alt.az}]);ch.onArrive=()=>enterSpot(ch,alt)}}else enterSpot(ch,s)};
+  });
+  if(HS.seeker.isPlayer){HS.pmode="van";G.fpYaw=0;G.fpPitch=-.05}
+  chime([784,988,1175],.08,.3);
+  toast(HS.seeker.isPlayer?"🙈 Close your eyes and count! Everyone is running to hide…":"🏃 Run! You have 45 seconds to find a hiding spot. Look at something and tap Hide.",3600);
+}
+function enterSpot(ch,s,quick){
+  if(s.occupant&&s.occupant!==ch)return false;
+  s.occupant=ch;s.openTarget=1;ch.state="entering";ch.spot=s;ch.c.visible=true;
+  const p=ch.c.position;ch.anim={k:"enter",t:0,dur:quick?.01:1.1,fx:p.x,fz:p.z,s};
+  return true;
+}
+function runAnim(ch,dt){
+  const a=ch.anim;a.t+=dt;const k=Math.min(1,a.t/a.dur),s=a.s;
+  if(a.k==="enter"){
+    ch.c.position.x=a.fx+(s.hx-a.fx)*k;ch.c.position.z=a.fz+(s.hz-a.fz)*k;ch.c.position.y=s.f*4+(s.verb==="under"?.15*k:0);
+    ch.c.rotation.y=lerpAngle(ch.c.rotation.y,Math.atan2(s.hx-a.fx,s.hz-a.fz),.3);
+    if(s.verb==="under")ch.c.rotation.x=-PI/2*Math.min(1,k*1.6);else if(s.verb==="behind")ch.c.scale.y=1-.3*k;
+    animChar(ch.c,1-k,nowT,dt);
+    if(k>=1){ch.c.visible=false;ch.c.rotation.x=0;ch.c.scale.y=1;s.openTarget=0;ch.state="hidden";ch.f=s.f;ch.anim=null;if(ch.isPlayer)playerHidden()}
+  }else if(a.k==="pop"){
+    ch.c.position.y=s.f*4+Math.abs(Math.sin(k*PI*2))*.6;animChar(ch.c,0,nowT,dt);
+    if(k>=1){ch.anim=null;ch.c.position.y=s.f*4;if(!ch.isPlayer)sendToVan(ch)}
+  }
+}
+function sendToVan(ch){const idx=HS.chars.filter(c=>c.state==="atVan"||c.state==="toVan").length;ch.state="toVan";ch.speed=4.5;navTo(ch,"van",[{x:3.6,z:22.4+idx*1.1}]);ch.onArrive=()=>{ch.state="atVan";ch.c.rotation.y=-PI/2}}
+function beginSeek(){
+  HS.phase="seek";HS.timer=60;HS.lastTick=99;
+  HS.chars.forEach(ch=>{if(ch!==HS.seeker&&ch.state!=="hidden"&&ch.state!=="entering"){
+    let s=ch.spot&&!ch.spot.occupant?ch.spot:null;
+    if(!s){const p=ch.c.position;s=HS.spots.filter(q=>!q.occupant).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)+8*Math.abs(a.f-ch.f)-Math.hypot(b.x-p.x,b.z-p.z)-8*Math.abs(b.f-ch.f))[0]}
+    ch.path=[];ch.onArrive=null;enterSpot(ch,s,true);
+    if(ch.isPlayer){toast(`⏰ Time’s up! You jumped into the ${s.name}.`,2600)}}});
+  const sk=HS.seeker;sk.c.position.set(2.6,0,24.5);sk.f=0;sk.c.rotation.y=PI;
+  if(sk.isPlayer){HS.pmode="fp";G.fpYaw=0;G.fpPitch=-.05;toast("🔍 Ready or not, here you come! Find all 4 on the 🔴 red team, but don’t find all 3 of your 🔵 teammates!",4200)}
+  else{sk.c.visible=true;sk.state="seeking";sk.speed=4.4;toast(`🔍 Ready or not! ${sk.name} is coming to find you…`,3000)}
+  chime([523,659,784,1047],.08,.35);
+}
+function playerHidden(){HS.pmode="ghost";HS.view="follow";const s=HP.spot;HS.mySpot=s;HS.glow.visible=true;HS.glow.scale.set(s.w+.4,s.h+.4,s.d+.4);HS.glow.position.set(s.x,s.f*4+s.h/2,s.z);HS.glow.rotation.y=Math.atan2(s.fx,s.fz);chime([659,880],.08,.3);toast(`🙈 You’re hiding ${s.verb} the ${s.name}! Now float around and watch the seeker.`,3200)}
+function hsAction(){
+  if(G.mode!=="hs"||!G.playing)return;
+  if(HS.pmode==="ghost"||HS.pmode==="spectate"){HS.view=HS.view==="follow"?"spot":"follow";if(HS.pmode==="spectate")HS.view="follow";return}
+  if(HS.pmode!=="fp")return;const s=HS.look;if(!s)return;
+  if(HS.phase==="hide"&&HP!==HS.seeker){if(s.occupant){toast("Someone is already hiding there! 🤫");return}
+    s.reserved=HP;HS.chars.forEach(c=>{if(!c.isPlayer&&c.spot===s&&c.state==="toSpot"){const alt=HS.spots.find(q=>!q.occupant&&!q.reserved);if(alt){alt.reserved=c;c.spot=alt;navTo(c,alt.n,[{x:alt.ax,z:alt.az}]);c.onArrive=()=>enterSpot(c,alt)}}});
+    HP.c.position.set(s.ax,s.f*4,s.az);HP.f=s.f;hero.visible=true;HS.pmode="cut";HS.cut={k:"hide",s};enterSpot(HP,s);return}
+  if(HS.phase==="seek"&&HP===HS.seeker&&HS.searchT<=0){HS.searchT=.7;HS.searchSpot=s;s.openTarget=1;tone(520,ac?ac.currentTime:0,.15,"triangle",.06)}
+}
+function resolveSearch(s,by){
+  s.checked=true;const oc=s.occupant;
+  if(oc&&oc.state==="hidden"&&oc!==by){
+    s.occupant=null;oc.state="found";oc.c.visible=true;oc.c.position.set(s.ax,s.f*4,s.az);oc.f=s.f;oc.c.rotation.y=Math.atan2(by.c.position.x-s.ax,by.c.position.z-s.az);oc.anim={k:"pop",t:0,dur:1.2,s};
+    const own=oc.team===by.team;if(own)HS.found.own++;else HS.found.enemy++;
+    const tag=oc.team==="blue"?"🔵":"🔴";
+    if(oc.isPlayer){chime([392,330,262],.12,.35,"triangle",.1);playerFound(by)}
+    else if(by.isPlayer){if(own){chime([330,262],.15,.35,"triangle",.1);toast(`😬 Oops! You found ${oc.name} ${tag}. That’s your own team! (${HS.found.own}/3)`,2800)}else{chime([988,1319,1568],.06,.3);toast(`🎉 Found ${oc.name} ${tag}! (${HS.found.enemy}/4)`,2400)}}
+    else toast(`👀 ${by.name} found ${oc.name} ${tag} ${s.verb} the ${s.name}!`,2400);
+    setTimeout(()=>{s.openTarget=0},1200);
+    if(HS.found.enemy>=4){HS.phase="ending";setTimeout(()=>endHS("seekerWin"),1400)}else if(HS.found.own>=3){HS.phase="ending";setTimeout(()=>endHS("ownOut"),1400)}
+  }else{setTimeout(()=>{s.openTarget=0},500);if(by.isPlayer)toast(`Nobody ${s.verb} the ${s.name}…`,1300)}
+}
+function playerFound(by){
+  HS.pmode="cut";HS.cut={k:"found",t:0};HS.glow.visible=false;hero.visible=true;
+  toast(`😱 ${by.name} found you!`,2600);
+}
+function seekerAI(dt){
+  const sk=HS.seeker;if(sk.anim)return;
+  if(sk.searchT>0){sk.searchT-=dt;if(sk.searchT<=0)resolveSearch(sk.searchSpot,sk);return}
+  if(sk.path.length)return;
+  const p=sk.c.position;const cand=HS.spots.filter(s=>!s.checked);if(!cand.length)return;
+  let pick;const occ=cand.filter(s=>s.occupant&&s.occupant.state==="hidden");
+  if(occ.length&&Math.random()<.3)pick=occ.sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];
+  else pick=cand.map(s=>({s,v:Math.hypot(s.x-p.x,s.z-p.z)+14*Math.abs(s.f-sk.f)+Math.random()*7})).sort((a,b)=>a.v-b.v)[0].s;
+  pick.checked=true;navTo(sk,pick.n,[{x:pick.ax,z:pick.az}]);
+  sk.onArrive=()=>{sk.c.rotation.y=Math.atan2(pick.x-sk.c.position.x,pick.z-sk.c.position.z);pick.openTarget=1;sk.searchT=1;sk.searchSpot=pick};
+}
+function giggle(){
+  const hid=HS.chars.filter(c=>c.state==="hidden"&&c!==HS.seeker);if(!hid.length)return;
+  const ch=hid[Math.floor(Math.random()*hid.length)],s=ch.spot;
+  const sp=label("hehe! 🤭",TEAM[ch.team].label);sp.position.set(s.x,s.f*4+s.h+.9,s.z);sp.scale.set(2.2,.55,1);hsAdd(sp);HS.gigs.push({s:sp,t:2.2});
+  if(HS.seeker.isPlayer&&HP.f===s.f){const d=Math.hypot(HP.c.position.x-s.x,HP.c.position.z-s.z);if(d<22&&ac)tone(1400+Math.random()*300,ac.currentTime,.25,"sine",.08*(1-d/22))}
+}
+function endHS(reason){
+  if(HS.phase==="end")return;HS.phase="end";G.playing=false;
+  const sk=HS.seeker,st=sk.team,other=st==="blue"?"red":"blue";const winner=reason==="seekerWin"?st:other;HS.wins[winner]++;
+  const why=reason==="seekerWin"?`${sk.isPlayer?"You":sk.name} found all 4 hiders on the other team!`:reason==="ownOut"?`${sk.isPlayer?"You":sk.name} found all 3 of ${sk.isPlayer?"your":"their"} own teammates, so ${sk.isPlayer?"your":"their"} team loses!`:`Time’s up! ${sk.isPlayer?"You":sk.name} ran out of time.`;
+  const blueWon=winner==="blue";if(blueWon){confetti(50);chime([523,659,784,1047,1319],.1,.45)}else chime([523,494,440,392],.15,.4,"triangle",.1);
+  $("#hsRole").hidden=true;
+  setTimeout(()=>showScreen(`<span class="script byline">Hide and Seek</span><h1>${blueWon?"🔵 Blue team wins!":"🔴 Red team wins!"}</h1><p>${why}</p><p><b>Rounds won: 🔵 ${HS.wins.blue} – ${HS.wins.red} 🔴</b></p><p>Next round I want to be:</p><div class="row2"><button class="big" data-hs="hider">🙈 Hider</button><button class="big" data-hs="seeker" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔍 Seeker</button></div><div class="row2"><button class="ghostbtn" data-mode="menu">Main menu</button></div>`),1200);
+}
+function tickSound(){const s=Math.ceil(HS.timer);if(s<=10&&s>0&&s!==HS.lastTick){HS.lastTick=s;if(ac)tone(s<=3?1320:990,ac.currentTime,.12,"square",.07)}}
+
+/* per-frame */
+function hsUpdate(dt,t){
+  if(HS.phase==="intro"){HS.introT+=dt;const k=Math.min(1,HS.introT/4.2),e=1-Math.pow(1-k,3);HS.van.position.z=70-44*e;HS.wheels.forEach(w=>w.rotation.x-=dt*(1-k)*10);
+    const v=HS.van.position,seats=[[.55,-1.4],[-.6,0],[.6,0],[-.55,-1.4],[-.6,1.4],[.6,1.4],[-.6,2.5],[.6,2.5]];
+    HS.chars.forEach((ch,i)=>{ch.c.visible=true;ch.c.position.set(v.x+seats[i][0],.7,v.z+seats[i][1]);ch.c.rotation.set(0,PI,0)});
+    if(k>=1)beginHide()}
+  else if(HS.phase==="hide"||HS.phase==="seek"){HS.timer-=dt;tickSound();if(HS.timer<=0){HS.timer=0;if(HS.phase==="hide")beginHide2();else endHS("time")}}
+  hsPlayer(dt,t);
+  HS.chars.forEach(ch=>{if(ch.isPlayer){if(ch.anim)runAnim(ch,dt);return}
+    if(ch.anim){runAnim(ch,dt);return}
+    if(!ch.c.visible)return;
+    if(ch.path.length){const p=ch.path[0];const d=walkTo(ch,p.x,p.z,ch.speed,dt);if(d<.35){ch.path.shift();if(!ch.path.length&&ch.onArrive){const f=ch.onArrive;ch.onArrive=null;f()}}animChar(ch.c,1,t*1.15,dt)}
+    else animChar(ch.c,0,t,dt)});
+  if(HS.phase==="seek"&&!HS.seeker.isPlayer)seekerAI(dt);
+  if(HS.phase==="seek"&&HS.seeker.isPlayer&&HS.searchT>0){HS.searchT-=dt;if(HS.searchT<=0)resolveSearch(HS.searchSpot,HP)}
+  HS.spots.forEach(s=>animSpot(s,dt));
+  if(HS.phase==="seek"){HS.gigT-=dt;if(HS.gigT<=0){HS.gigT=5+Math.random()*4;giggle()}}
+  for(let i=HS.gigs.length-1;i>=0;i--){const g=HS.gigs[i];g.t-=dt;g.s.position.y+=dt*.3;if(g.t<=0){hsGroup.remove(g.s);HS.gigs.splice(i,1)}}
+  if(HS.glow.visible)HS.glow.material.opacity=.25+Math.sin(t*5)*.15;
+  HS.ring.rotation.z+=dt*.5;HS.ring.position.x=3+Math.sin(t*.4)*2;
+  hsHUD();
+}
+function beginHide2(){beginSeek()}
+function hsPlayer(dt,t){
+  const pm=HS.pmode;
+  if(pm==="fp"&&HS.phase!=="end"){
+    let ix=0,iz=0;if(keys["a"])ix-=1;if(keys["d"])ix+=1;if(keys["w"]||keys["arrowup"])iz+=1;if(keys["s"]||keys["arrowdown"])iz-=1;
+    if(keys["arrowleft"])G.fpYaw+=2.2*dt;if(keys["arrowright"])G.fpYaw-=2.2*dt;
+    if(joy.id!==null){ix+=joy.x;iz-=joy.y}const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}
+    const y=G.fpYaw,fx=-Math.sin(y),fz=-Math.cos(y),rx=Math.cos(y),rz=-Math.sin(y),sp=HP===HS.seeker?6:5.5;
+    const dx=(fx*iz+rx*ix)*sp*dt,dz=(fz*iz+rz*ix)*sp*dt;if(il>.05){hsStep(HP,dx,dz);HS.bob=(HS.bob||0)+dt*9*Math.min(1,il)}
+    HP.c.rotation.y=y+PI;
+    // look target
+    const p=HP.c.position;let best=null,bs=.72;
+    for(const s of HS.spots){if(s.f!==HP.f)continue;const ddx=s.x-p.x,ddz=s.z-p.z,d=Math.hypot(ddx,ddz);if(d>s.reach)continue;const dot=d<.6?1:(ddx*fx+ddz*fz)/d;if(dot<bs)continue;if(!los(p.x,p.z,s.ax,s.az,HP.f))continue;bs=dot;best=s}
+    HS.look=best;
+  }else HS.look=null;
+  if(pm==="cut"&&HS.cut&&HS.cut.k==="found"){HS.cut.t+=dt;if(HS.cut.t>1.8&&!HS.cut.done){HS.cut.done=true;fadeTo(()=>{HP.c.position.set(0,0,15.6);HP.f=0;HP.c.rotation.set(0,0,0);hero.visible=true;HS.pmode="walkVan";HS.snap=true;HP.speed=4;HP.path=[{x:2.6,z:21},{x:3.6,z:22.4+HS.chars.filter(c=>c.state==="atVan").length*1.1}];HP.onArrive=()=>{HP.state="atVan";HP.c.rotation.y=-PI/2;HS.pmode="spectate";HS.view="follow";if(HS.phase!=="end")$("#hsRole").hidden=false};toast("🚐 Head back to the van…",2000)})}}
+  if(pm==="walkVan"){if(HP.path.length){const p=HP.path[0];const d=walkTo(HP,p.x,p.z,HP.speed,dt);animChar(hero,1,t*1.1,dt);if(d<.35){HP.path.shift();if(!HP.path.length&&HP.onArrive){const f=HP.onArrive;HP.onArrive=null;f()}}}}
+}
+const hsCamPos=new THREE.Vector3(),hsLook=new THREE.Vector3();
+function hsCamera(dt){
+  const pm=HS.pmode;let snap=false;const W=(x,y,z)=>new THREE.Vector3(x+HX,y,z);
+  if(HS.phase==="intro"||pm==="intro"){const v=HS.van.position;hsCamPos.copy(W(v.x+8,4.5,v.z+8));hsLook.copy(W(v.x,1.5,v.z));snap=true}
+  else if(pm==="fp"){const p=HP.c.position;camera.position.copy(W(p.x,p.y+1.6+Math.sin(HS.bob||0)*.05,p.z));camera.rotation.set(G.fpPitch,G.fpYaw,0,"YXZ");return}
+  else if(pm==="van"){const v=HS.van.position;camera.position.copy(W(v.x-.55,2.7,v.z-.7));camera.rotation.set(G.fpPitch,G.fpYaw,0,"YXZ");return}
+  else if(pm==="cut"){const p=HP.c.position,s=HP.spot||HS.mySpot;const bx=s?s.ax+s.fx*2.6:p.x+2.5,bz=s?s.az+s.fz*2.6:p.z+2.5;hsCamPos.copy(W(bx,(s?s.f*4:p.y)+2.6,bz));hsLook.copy(W(s?s.x:p.x,(s?s.f*4:p.y)+1,s?s.z:p.z))}
+  else if(pm==="walkVan"){const p=HP.c.position;hsCamPos.copy(W(p.x+6,p.y+3.5,p.z+1));hsLook.copy(W(p.x,p.y+1.4,p.z));if(HS.snap){HS.snap=false;snap=true}}
+  else{ // ghost / spectate
+    if(HS.view==="spot"&&HS.mySpot&&pm==="ghost"){const s=HS.mySpot;hsCamPos.copy(W(s.ax+s.fx*1.8,s.f*4+2.6,s.az+s.fz*1.8));hsLook.copy(W(s.x,s.f*4+s.h/2,s.z))}
+    else{const sk=HS.seeker;let tx,ty,tz;if(HS.phase==="hide"||!sk.c.visible){const v=HS.van.position;tx=v.x;ty=1.5;tz=v.z}else{const p=sk.c.position;tx=p.x;ty=p.y+1.6;tz=p.z}
+      const a=G.fpYaw,dist=3.4;hsCamPos.copy(W(tx+Math.sin(a)*dist,ty+1,tz+Math.cos(a)*dist));hsLook.copy(W(tx,ty,tz))}
+  }
+  if(snap)camera.position.copy(hsCamPos);else camera.position.lerp(hsCamPos,Math.min(1,dt*5));
+  camera.lookAt(hsLook);
+}
+function hsHUD(){
+  const tm=Math.max(0,Math.ceil(HS.timer)),mm=Math.floor(tm/60),ss=String(tm%60).padStart(2,"0");
+  const el=$("#hsTimer");const txt=HS.phase==="intro"?"🚐 Driving…":`⏱ ${mm}:${ss}`;if(el.textContent!==txt)el.textContent=txt;
+  el.classList.toggle("hurry",(HS.phase==="hide"||HS.phase==="seek")&&tm<=10);
+  const sk=HS.seeker;let ph="";
+  if(HS.phase==="hide")ph=sk.isPlayer?"🙈 Counting in the van…":"🙈 Hide!";else if(HS.phase==="seek")ph=`🔍 ${sk.isPlayer?"You are":sk.name+" is"} seeking`;
+  $("#hsPhase").textContent=ph;
+  $("#hsFound").textContent=HS.phase==="seek"?`Found: other team ${HS.found.enemy}/4, own team ${HS.found.own}/3 (${sk.team==="blue"?"🔵":"🔴"} seeker)`:"";
+  const cnt=$("#hsCount");const showCnt=HS.pmode==="van"&&HS.phase==="hide";cnt.hidden=!showCnt;if(showCnt)cnt.textContent=`🙈 Counting… ${tm}`;
+  const meter=$("#hsMeter"),showM=HS.pmode==="ghost"&&HS.mySpot&&HS.phase==="seek"&&sk.c.visible;meter.hidden=!showM;
+  if(showM){const s=HS.mySpot,p=sk.c.position;const d=Math.hypot(p.x-s.x,p.z-s.z,(p.y-s.f*4)*1.5),ft=Math.round(d*3.28);
+    const heat=Math.max(0,Math.min(1,1-d/20));$("#hsFeet").textContent=`👣 Seeker is ${ft} ft away ${d<4?"🔥 HOT!":d<9?"😬 Warm":d<15?"🙂 Cool":"❄️ Cold"}`;
+    const bar=$("#hsHC");bar.style.width=(8+heat*92)+"%";bar.style.background=`hsl(${Math.round(210-210*heat)},90%,55%)`;
+    if(d<6){HS.beatT=(HS.beatT||0)-1/60;if(HS.beatT<=0&&ac){HS.beatT=.25+d*.12;tone(90,ac.currentTime,.15,"sine",.15)}}}
+  const act=$("#hsAct");let lab="";
+  if(HS.pmode==="fp"&&HS.look){const s=HS.look,seek=HP===HS.seeker&&HS.phase==="seek";if(seek)lab=`🔍 ${spotVerb(s,true)} the ${s.name}`;else if(HS.phase==="hide"&&HP!==HS.seeker)lab=s.occupant?"🤫 Someone’s already there":`🙈 ${spotVerb(s,false)} the ${s.name}`}
+  if(act.dataset.l!==lab){act.dataset.l=lab;act.textContent=lab;act.hidden=!lab}
+  const vb=$("#hsView"),showV=HS.pmode==="ghost";vb.hidden=!showV;if(showV){const vt=HS.view==="follow"?"🙈 See my spot":"👻 Follow the seeker";if(vb.textContent!==vt)vb.textContent=vt}
+  $("#hsCross").hidden=HS.pmode!=="fp";
+}
+
 /* ---------- game state ---------- */
 const G={};
 function resetGame(){
@@ -688,18 +1112,18 @@ addEventListener("keydown",e=>{
   if(k===" "||k==="arrowup"||k==="arrowdown")e.preventDefault();
   if(k===" "&&!e.repeat){jumpQueued=true;jumpHeld=true}
   if(k==="shift")dash();
-  if(k==="e"){if(G.mode==="ctf")ctxAction();else toggleWish()}
+  if(k==="e"){if(G.mode==="hs")hsAction();else if(G.mode==="ctf")ctxAction();else toggleWish()}
 });
 addEventListener("keyup",e=>{const k=e.key.toLowerCase();keys[k]=false;if(k===" ")jumpHeld=false});
 let camDrag=null;
 canvas.addEventListener("pointerdown",e=>{
   if(!G.playing)return;
   if(e.pointerType!=="mouse"&&e.clientX<innerWidth*.5&&joy.id===null){joy.id=e.pointerId;joy.ox=e.clientX;joy.oy=e.clientY;joy.x=joy.y=0;const j=$("#joy");j.style.left=e.clientX+"px";j.style.top=e.clientY+"px";j.style.display="block";$("#knob").style.transform="";$("#joyHint").style.opacity="0";canvas.setPointerCapture(e.pointerId);return}
-  camDrag={id:e.pointerId,x:e.clientX};canvas.setPointerCapture(e.pointerId);
+  camDrag={id:e.pointerId,x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener("pointermove",e=>{
   if(e.pointerId===joy.id){let dx=e.clientX-joy.ox,dy=e.clientY-joy.oy;const d=Math.hypot(dx,dy),max=55;if(d>max){dx*=max/d;dy*=max/d}joy.x=dx/max;joy.y=dy/max;$("#knob").style.transform=`translate(${dx}px,${dy}px)`;return}
-  if(camDrag&&e.pointerId===camDrag.id){G.camYaw-=(e.clientX-camDrag.x)*.008;camDrag.x=e.clientX;G.manualT=1.8}
+  if(camDrag&&e.pointerId===camDrag.id){if(G.mode==="hs"){G.fpYaw-=(e.clientX-camDrag.x)*.006;G.fpPitch=Math.max(-1.2,Math.min(1.1,G.fpPitch-(e.clientY-camDrag.y)*.005));camDrag.y=e.clientY}else{G.camYaw-=(e.clientX-camDrag.x)*.008;G.manualT=1.8}camDrag.x=e.clientX}
 });
 function endPtr(e){if(e.pointerId===joy.id){joy.id=null;joy.x=joy.y=0;$("#joy").style.display="none"}if(camDrag&&e.pointerId===camDrag.id)camDrag=null}
 canvas.addEventListener("pointerup",endPtr);canvas.addEventListener("pointercancel",endPtr);
@@ -771,23 +1195,30 @@ function exitVault(){G.doorCD=2;fadeTo(()=>{G.inVault=false;hero.position.set(-4
 /* ---------- game flow ---------- */
 function showScreen(html){$("#screenCard").innerHTML=html;$("#screen").hidden=false}
 function audioOn(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==="suspended")ac.resume()}
-function menuHTML(){return `<span class="script byline">by Lola 🩵</span><h1>The Hero’s Dream</h1><p>Pick a game:</p><div class="modes"><button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button><button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button></div>`}
+function menuHTML(){return `<span class="script byline">by Lola 🩵</span><h1>The Hero’s Dream</h1><p>Pick a game:</p><div class="modes"><button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button><button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button><button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button></div>`}
 const STAR_RULES=`<span class="script byline">Star Mansion</span><h1>The Hero’s Dream</h1><p>Leaha wants to be the best hero in the world. Collect dream stars around the secret magic school and bring them to your mansion site to build a huge mansion, before your rival Lora finishes her tower!</p><ul><li>😈 Don’t let Eloise touch you! She takes your stars, and then you have to chase her to get them back.</li><li>🤧 School rule: when you’re sick, no magic. Dodge her sneeze clouds!</li><li>💅 Find Cardi B for a belly bump boost.</li><li>💎 Your magic necklace makes anything you wish for.</li><li>🗝️ Somewhere there’s a secret room…</li><li>🎮 Phone: drag on the left to move, tap the buttons for powers. Computer: arrow keys or WASD, Space to jump (hold to fly), Shift to dash, E to wish.</li></ul><button class="big" id="starGo">We’ve got this 🩵</button>`;
 const CTF_RULES=`<span class="script byline">The Hero’s Dream</span><h1>Capture the Flag</h1><p>🔵 Your team: Leaha, Cardi B, Mom, Dad, Mia, Jay and Zoe<br>🔴 Lora’s team: Lora, Eloise, Nana, Titi Sam, Max, Ivy and Leo</p><ul><li>🚩 First, you and Lora each plant your flag anywhere on your own side. Then a 5-second countdown starts the game.</li><li>⚡ A forcefield splits the field in half. On your side you’re safe and nobody can tag you. Cross into Lora’s side and everything turns a little red: now you can get tagged!</li><li>🔒 Get tagged and you go to jail on the enemy side. Wait for the game to end, or for a teammate to reach the jail and set everyone free. Tap 📣 Help to call for a rescue.</li><li>🏆 Grab Lora’s flag and carry it back across the forcefield to score. Get tagged while carrying it and you drop it! First team to 3 flags wins, or whoever has more when the 4 minutes run out.</li><li>✨ Power-ups float near the middle: ⚡ speed boots, 🛡️ shield bubble, ❄️ freeze blast and 🦘 super jump. Nobody can tag you while you’re in the air!</li><li>💅 Cardi B’s big belly bump tags from extra far away.</li><li>👕 Everyone on a team wears the same color: blue is your team, red is Lora’s.</li></ul><button class="big" id="ctfGo">Let’s plant our flags! 🚩</button>`;
 function setWorld(m){
-  G.mode=m;document.body.classList.toggle("mode-ctf",m==="ctf");document.body.classList.toggle("mode-star",m!=="ctf");
-  starWorld.forEach(o=>o.visible=m!=="ctf");stars.forEach(s=>s.m.visible=m!=="ctf"&&s.active);ctfGroup.visible=m==="ctf";
-  rainbow.position.z=(m==="ctf"?FZ:0)-95;skyStars.position.z=m==="ctf"?FZ:0;
-  $("#wishMenu").hidden=true;$("#redTint").classList.remove("on");$("#readyBtn").hidden=true;$("#count").textContent="";
+  G.mode=m;document.body.classList.remove("mode-star","mode-ctf","mode-hs");document.body.classList.add("mode-"+m);
+  starWorld.forEach(o=>o.visible=m==="star");stars.forEach(s=>s.m.visible=m==="star"&&s.active);ctfGroup.visible=m==="ctf";hsGroup.visible=m==="hs";
+  rainbow.position.set(m==="hs"?HX:0,0,(m==="ctf"?FZ:0)-95);skyStars.position.set(m==="hs"?HX:0,0,m==="ctf"?FZ:0);
+  if(m==="hs"){if(hero.parent!==hsGroup)hsGroup.add(hero);buddy.visible=false}
+  else{if(hero.parent!==scene)scene.add(hero);hero.visible=true;hero.rotation.x=0;hero.scale.set(1,1,1);buddy.visible=true;HS.phase="off"}
+  $("#wishMenu").hidden=true;$("#redTint").classList.remove("on");$("#readyBtn").hidden=true;$("#count").textContent="";$("#hsRole").hidden=true;
   P.shield.visible=false;P.ice.visible=false;
 }
 function openMode(m){
   audioOn();G.playing=false;
-  if(m==="menu"){C.phase="off";setWorld(G.mode==="ctf"?"ctf":"star");showScreen(menuHTML());return}
+  if(m==="menu"){C.phase="off";if(G.mode==="hs"){setWorld("star");resetGame();snapCam()}else setWorld(G.mode==="ctf"?"ctf":"star");showScreen(menuHTML());return}
+  if(m==="hs"){setWorld("hs");hsPrep();G.over=false;HS.pmode="intro";showScreen(HS_RULES);return}
   if(m==="star"){setWorld("star");resetGame();snapCam();showScreen(STAR_RULES);return}
   if(m==="ctf"){setWorld("ctf");ctfReset();G.over=false;snapCam();showScreen(CTF_RULES);return}
 }
+const HS_RULES=`<span class="script byline">The Hero’s Dream</span><h1>Hide and Seek</h1><p>🔵 Leaha, Cardi B, Mom and Dad vs 🔴 Lora, Eloise, Nana and Titi Sam</p><ul><li>🚐 We drive up to the mansion in the van. One player is the seeker and the other 7 hide.</li><li>🙈 Hiders get 45 seconds to run in and hide anywhere: wardrobes, the fridge, the washing machine, under beds, behind couches, or out by the pool. 7 bedrooms, 2 living rooms and a backyard!</li><li>🔍 The seeker counts in the van, then has 1 minute to search.</li><li>🏆 Seeker’s mission: find all 4 hiders on the other team. But if you find all 3 of your own teammates first, your team loses!</li><li>👻 Once you hide, float around and watch the seeker. The hot/cold meter shows how many feet away they are.</li><li>😱 Found? You walk back to the van and choose hider or seeker for next round.</li><li>🤭 Listen for giggles! The bubble color shows which team is hiding there.</li><li>🎮 Drag the left side to walk, drag the right side to look around. Look at a hiding spot and tap the button.</li></ul><div class="row2"><button class="big" data-hs="hider">🙈 I’ll hide</button><button class="big" data-hs="seeker" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔍 I’ll seek</button></div>`;
 document.addEventListener("click",e=>{
+  const hb=e.target.closest("[data-hs]");if(hb){hsStart(hb.dataset.hs);return}
+  const hn=e.target.closest("[data-hsnext]");if(hn){HS.nextRole=hn.dataset.hsnext;$("#hsRole").hidden=true;toast(`Got it! Next round you’re the ${HS.nextRole}. Watching the seeker now… 👀`,2600);return}
+  if(e.target.closest("#hsAct")||e.target.closest("#hsView")){hsAction();return}
   const mb=e.target.closest("[data-mode]");if(mb){openMode(mb.dataset.mode);return}
   if(e.target.closest("#starGo")){audioOn();$("#screen").hidden=true;G.playing=true;G.over=false;toast("Collect ⭐ dream stars and bring them to Leaha’s Mansion! We’ve got this 🩵",3600);chime([784,988,1175,1568],.09,.4);return}
   if(e.target.closest("#ctfGo")){audioOn();$("#screen").hidden=true;C.phase="plant";G.playing=true;toast("Lora is planting her flag! Walk anywhere on your side and tap 🚩 Plant.",3400);chime([784,988,1175],.09,.3);return}
@@ -819,6 +1250,7 @@ function frame(){
   if(G.playing)update(dt,t);
   ambient(dt,t);
   // camera
+  if(G.mode==="hs"){hsCamera(dt);if(toastT>0){toastT-=dt;if(toastT<=0)$("#toast").classList.remove("on")}renderer.render(scene,camera);requestAnimationFrame(frame);return}
   const ct=camTarget();
   if(G.inVault&&G.mode!=="ctf"){const dx=ct.x-V.x,dz=ct.z-V.z,d=Math.hypot(dx,dz);if(d>10.5){ct.x=V.x+dx/d*10.5;ct.z=V.z+dz/d*10.5}}
   camPos.lerp(ct,Math.min(1,6*dt));if(camPos.y<1.5)camPos.y=1.5;camera.position.copy(camPos);
@@ -829,6 +1261,7 @@ function frame(){
 }
 function update(dt,t){
   G.time+=dt;
+  if(G.mode==="hs"){hsUpdate(dt,t);return}
   // timers
   ["dashT","dashCD","speedT","sickT","magnetT","wishCD","doorCD","manualT","eCD","lPause","cardiCD","superT"].forEach(k=>{if(G[k]>0)G[k]=Math.max(0,G[k]-dt)});
   if(G.magnetT<=0)magnetRing.visible=false;
