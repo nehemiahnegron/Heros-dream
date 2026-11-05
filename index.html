@@ -165,7 +165,7 @@ body:not(.mode-hs) .hs-only{display:none!important}
     <div class="modes">
       <button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button>
       <button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button>
-      <button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button>
+      <button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button><a class="mode" href="hide-and-seek.html" style="text-decoration:none"><span class="ic">🌐</span><b style="color:#2BCB8B">Hide and Seek Online</b><span>Play on separate phones with family! Share a 4-letter code.</span></a>
     </div>
     <p class="needs-js">To play, open this game from a web link in Chrome or Safari.</p>
   </div>
@@ -248,9 +248,11 @@ function makeChar(o){
     if(o.hair==="bob")head.add(M(cyl(.6,.63,.42,20,true,PI/2,PI),hairM,0,-.12,0));
     if(o.hair==="pigtails")[-1,1].forEach(s=>{const p=M(sph(.2,12,10),hairM,s*.66,-.12,-.08);p.scale.set(.9,1.25,.9);head.add(p)});
     if(o.hair==="bun")head.add(M(sph(.24,14,10),hairM,0,.56,-.22));
+    if(o.hair==="curly"){head.add(M(sph(.2,10,8),hairM,0,.6,-.02));[[.3,6],[.6,10],[.9,12],[1.2,12]].forEach(([pol,n],i)=>{for(let j=0;j<n;j++){const az=j/n*PI*2+i*.3,x=Math.sin(pol)*Math.sin(az)*.63,y=Math.cos(pol)*.6+.03,z=Math.sin(pol)*Math.cos(az)*.63;if(z>.28&&pol>.8)continue;head.add(M(sph(.17,8,6),hairM,x,y,z))}})}
   }
   if(o.bonnet){const bm=toon(o.bonnet);const b=M(sph(.68,22,16),bm,0,.3,-.2);b.scale.set(1.06,.92,1.08);head.add(b);const band=M(new THREE.TorusGeometry(.6,.09,8,28),bm,0,.12,.02);band.rotation.x=PI/2-.45;head.add(band)}
-  if(o.glasses){const gm=basic("#2A1B3D");[-1,1].forEach(s=>head.add(M(new THREE.TorusGeometry(.13,.022,6,16),gm,s*.19,.03,.53)));const br=M(cyl(.014,.014,.13,4),gm,0,.06,.54);br.rotation.z=PI/2;head.add(br)}
+  if(o.glasses==="club"){const blk=basic("#16111F"),gold=toon("#C9A227");[-1,1].forEach(s=>{head.add(M(new THREE.BoxGeometry(.31,.09,.05),blk,s*.19,.13,.545));const rim=M(new THREE.TorusGeometry(.13,.02,6,16,PI),gold,s*.19,.07,.535);rim.rotation.z=PI;head.add(rim);head.add(M(new THREE.BoxGeometry(.03,.04,.5),blk,s*.34,.13,.3))});const br=M(cyl(.016,.016,.12,4),gold,0,.11,.56);br.rotation.z=PI/2;head.add(br)}
+  else if(o.glasses){const gm=basic("#2A1B3D");[-1,1].forEach(s=>head.add(M(new THREE.TorusGeometry(.13,.022,6,16),gm,s*.19,.03,.53)));const br=M(cyl(.014,.014,.13,4),gm,0,.06,.54);br.rotation.z=PI/2;head.add(br)}
   // unlockable looks
   const looks={};
   if(o.unlockable){
@@ -386,7 +388,7 @@ const eloise=makeChar({skin:"#E8B48C",hair:"pigtails",hairColor:"#2B1B12",outfit
 const eLabel=label("Eloise 😈","#E4D7FF");eLabel.position.y=2.9;eLabel.scale.set(3,.75,1);eloise.add(eLabel);
 const lora=makeChar({skin:"#F6D5BE",hair:"bun",hairColor:"#F4D06F",outfit:"dress",outfitColor:"#FF5E5E",eyes:"round"});scene.add(lora);
 const lLabel=label("Lora 😤","#FFD9B8");lLabel.position.y=3.3;lLabel.scale.set(3,.75,1);lora.add(lLabel);
-const family=[makeChar({skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",outfit:"dress",outfitColor:"#FF8FC4",eyes:"happy",scale:1.15}),makeChar({skin:"#C68642",hair:"none",hairColor:"#2B1B12",outfit:"tee",outfitColor:"#3A6FD9",eyes:"round",scale:1.2})];
+const family=[makeChar({skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",outfit:"dress",outfitColor:"#FF8FC4",eyes:"happy",scale:1.15}),makeChar({skin:"#C68642",hair:"curly",hairColor:"#2B1B12",outfit:"tee",outfitColor:"#3A6FD9",eyes:"round",glasses:"club",scale:1.2})];
 const famNames=["Mom","Dad"];
 const CARDI={skin:"#E8934F",hair:"none",hairColor:"#2B1B12",outfit:"tee",outfitColor:"#F7F7FB",pants:"#BFC3C9",eyes:"happy",belly:true,bonnet:"#C2185B",shirtDot:"#FF8FC4"};
 const cardi=makeChar(CARDI);cardi.position.set(6,0,6);scene.add(cardi);
@@ -445,7 +447,7 @@ const KID=[{skin:"#C68642",hair:"pigtails",hairColor:"#2B1B12",eyes:"round"},{sk
 const ROSTER={
   blue:[
     {name:"Cardi B 💅",look:Object.assign({},CARDI,{shirtDot:null}),role:"defend",speed:6.6,tagR:1.9},
-    {name:"Dad",look:{skin:"#C68642",hair:"none",hairColor:"#2B1B12",eyes:"round",scale:1.15},role:"defend",speed:7.6},
+    {name:"Dad",look:{skin:"#C68642",hair:"curly",hairColor:"#2B1B12",eyes:"round",glasses:"club",scale:1.15},role:"defend",speed:7.6},
     {name:"Mom",look:{skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",eyes:"happy",scale:1.1},role:"rescue",speed:7.6},
     {name:"Mia",look:KID[0],role:"attack",speed:7.4},
     {name:"Jay",look:KID[3],role:"attack",speed:7.6},
@@ -875,7 +877,7 @@ const HS_ROSTER=[
   {name:"Leaha",team:"blue",player:true},
   {name:"Cardi B",team:"blue",look:Object.assign({},CARDI,{shirtDot:null})},
   {name:"Mom",team:"blue",look:{skin:"#E8B48C",hair:"long",hairColor:"#2B1B12",eyes:"happy",scale:1.1}},
-  {name:"Dad",team:"blue",look:{skin:"#C68642",hair:"none",hairColor:"#2B1B12",eyes:"round",scale:1.15}},
+  {name:"Dad",team:"blue",look:{skin:"#C68642",hair:"curly",hairColor:"#2B1B12",eyes:"round",glasses:"club",scale:1.15}},
   {name:"Lora",team:"red",look:{skin:"#F6D5BE",hair:"bun",hairColor:"#F4D06F",eyes:"round"}},
   {name:"Eloise",team:"red",look:{skin:"#E8B48C",hair:"pigtails",hairColor:"#2B1B12",eyes:"happy",scale:.85}},
   {name:"Nana",team:"red",look:{skin:"#E8B48C",hair:"bun",hairColor:"#DADAE6",eyes:"happy",glasses:true,outfit:"dress",scale:1.05}},
@@ -1195,7 +1197,7 @@ function exitVault(){G.doorCD=2;fadeTo(()=>{G.inVault=false;hero.position.set(-4
 /* ---------- game flow ---------- */
 function showScreen(html){$("#screenCard").innerHTML=html;$("#screen").hidden=false}
 function audioOn(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==="suspended")ac.resume()}
-function menuHTML(){return `<span class="script byline">by Lola 🩵</span><h1>The Hero’s Dream</h1><p>Pick a game:</p><div class="modes"><button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button><button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button><button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button></div>`}
+function menuHTML(){return `<span class="script byline">by Lola 🩵</span><h1>The Hero’s Dream</h1><p>Pick a game:</p><div class="modes"><button class="mode" data-mode="star"><span class="ic">⭐</span><b>Star Mansion</b><span>Collect stars and build Leaha’s mansion before Lora finishes her tower!</span></button><button class="mode" data-mode="ctf"><span class="ic">🚩</span><b>Capture the Flag</b><span>7 on 7 against Lora’s team, with Cardi B on your side!</span></button><button class="mode" data-mode="hs"><span class="ic">🙈</span><b>Hide and Seek</b><span>Race into the mansion and hide! 4 blue vs 4 red.</span></button><a class="mode" href="hide-and-seek.html" style="text-decoration:none"><span class="ic">🌐</span><b style="color:#2BCB8B">Hide and Seek Online</b><span>Play on separate phones with family! Share a 4-letter code.</span></a></div>`}
 const STAR_RULES=`<span class="script byline">Star Mansion</span><h1>The Hero’s Dream</h1><p>Leaha wants to be the best hero in the world. Collect dream stars around the secret magic school and bring them to your mansion site to build a huge mansion, before your rival Lora finishes her tower!</p><ul><li>😈 Don’t let Eloise touch you! She takes your stars, and then you have to chase her to get them back.</li><li>🤧 School rule: when you’re sick, no magic. Dodge her sneeze clouds!</li><li>💅 Find Cardi B for a belly bump boost.</li><li>💎 Your magic necklace makes anything you wish for.</li><li>🗝️ Somewhere there’s a secret room…</li><li>🎮 Phone: drag on the left to move, tap the buttons for powers. Computer: arrow keys or WASD, Space to jump (hold to fly), Shift to dash, E to wish.</li></ul><button class="big" id="starGo">We’ve got this 🩵</button>`;
 const CTF_RULES=`<span class="script byline">The Hero’s Dream</span><h1>Capture the Flag</h1><p>🔵 Your team: Leaha, Cardi B, Mom, Dad, Mia, Jay and Zoe<br>🔴 Lora’s team: Lora, Eloise, Nana, Titi Sam, Max, Ivy and Leo</p><ul><li>🚩 First, you and Lora each plant your flag anywhere on your own side. Then a 5-second countdown starts the game.</li><li>⚡ A forcefield splits the field in half. On your side you’re safe and nobody can tag you. Cross into Lora’s side and everything turns a little red: now you can get tagged!</li><li>🔒 Get tagged and you go to jail on the enemy side. Wait for the game to end, or for a teammate to reach the jail and set everyone free. Tap 📣 Help to call for a rescue.</li><li>🏆 Grab Lora’s flag and carry it back across the forcefield to score. Get tagged while carrying it and you drop it! First team to 3 flags wins, or whoever has more when the 4 minutes run out.</li><li>✨ Power-ups float near the middle: ⚡ speed boots, 🛡️ shield bubble, ❄️ freeze blast and 🦘 super jump. Nobody can tag you while you’re in the air!</li><li>💅 Cardi B’s big belly bump tags from extra far away.</li><li>👕 Everyone on a team wears the same color: blue is your team, red is Lora’s.</li></ul><button class="big" id="ctfGo">Let’s plant our flags! 🚩</button>`;
 function setWorld(m){
