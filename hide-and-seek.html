@@ -175,6 +175,7 @@ body:not(.mode-hs) .hs-only{display:none!important}
 .ed-sw{display:flex;flex-wrap:wrap;gap:8px}
 .ed-sw button{width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px #DCD0FA}
 .ed-sw button.on{box-shadow:0 0 0 3px var(--grape)}
+.gtype{justify-content:center;margin-bottom:6px}
 .ed-note{font-size:.85rem;color:var(--muted);margin:10px 0 4px}
 </style>
 </head>
@@ -495,9 +496,12 @@ function setLabel(ch){if(ch.lbl)ch.c.remove(ch.lbl);const t=ch.name+(ch.pname?` 
 const SEATS=[[.55,-1.4],[-.6,0],[.6,0],[-.55,-1.4],[-.6,1.4],[.6,1.4],[-.6,2.5],[.6,2.5]];
 HS_ROSTER.forEach((r,i)=>{const c=makeChar(Object.assign({outfit:"hoodie"},r.look,{outfitColor:TEAM[r.team].color}));hsAdd(c);
   const belt=M(new THREE.BoxGeometry(.09,1.05,.06),toon("#3A3550"),0,1.2,r.look.belly?.8:.42);belt.rotation.z=.75;belt.visible=false;c.userData.body.add(belt);c.userData.belt=belt;const ch={idx:i,c,name:r.name,team:r.team,f:0,path:[],speed:5,human:null,pname:"",state:"van",vis:false,tgt:null};setLabel(ch);HS.chars.push(ch)});
-HS.me=0;HS.seekerIdx=-1;
+HS.me=0;HS.seekerIdx=-1;HS.seekers=[];HS.gmode="classic";
 const ME=()=>HS.chars[HS.me];
-const SEEKER=()=>HS.chars[HS.seekerIdx];
+const isSk=i=>HS.seekers.includes(i);
+const SKS=()=>HS.seekers.map(i=>HS.chars[i]);
+function nearestSk(x,z,y){let b=null,bd=1e9;SKS().forEach(s=>{if(!s.vis&&HS.phase==="seek")return;const p=s.c.position,d=Math.hypot(p.x-x,p.z-z,((p.y-(y||0))*1.5));if(d<bd){bd=d;b=s}});return b||HS.chars[HS.seekers[0]]}
+function SEEKER(){if(!HS.seekers.length)return null;if(isSk(HS.me))return ME();const r=HS.mySpot?{x:HS.mySpot.x,z:HS.mySpot.z,y:HS.mySpot.f*4}:ME().c.position;return nearestSk(r.x,r.z,r.y)}
 
 /* ---------- network ---------- */
 const NET={mode:"solo",peer:null,conns:{},hostConn:null,myId:"host",code:"",players:[],inT:0,snapT:0};
@@ -515,23 +519,28 @@ function chooseSeeker(){
   const free=HS.chars.filter(c=>!NET.players.some(p=>p.idx===c.idx));if(free.length)return free[Math.floor(Math.random()*free.length)].idx;
   return NET.players[Math.floor(Math.random()*NET.players.length)].idx;
 }
+NET.cfg={mode:"classic",seekTeam:"red"};
 function hostStartRound(){
-  const sk=chooseSeeker();const map=NET.players.filter(p=>p.idx>=0).map(p=>[p.idx,p.id,p.name,p.look||null]);
-  broadcast({t:"start",sk,map});startRound(sk,map);
+  const c=NET.cfg,sk=c.mode==="team"?HS.chars.filter(ch=>ch.team===c.seekTeam).map(ch=>ch.idx):[chooseSeeker()];
+  const map=NET.players.filter(p=>p.idx>=0).map(p=>[p.idx,p.id,p.name,p.look||null]);
+  broadcast({t:"start",sk,map,mode:c.mode});startRound(sk,map,c.mode);
 }
-function startRound(sk,map){
+function startRound(sk,map,mode){
+  if(!Array.isArray(sk))sk=[sk];HS.seekers=sk;HS.gmode=mode||"classic";
   audioOn();$("#screen").hidden=true;$("#hsRole").hidden=true;
   HS.chars.forEach(ch=>{ch.human=null;ch.pname="";ch.wantLook=null});
   map.forEach(([idx,id,name,look])=>{const ch=HS.chars[idx];ch.human=id;ch.pname=name&&name!==ch.name?name:"";ch.wantLook=look||null});
   HS.chars.forEach(ch=>{applyLook(ch,ch.wantLook);setLabel(ch)});
   const mine=map.find(m=>m[1]===NET.myId);HS.me=mine?mine[0]:0;
-  Object.assign(HS,{phase:"intro",introT:0,timer:45,lastTick:99,found:{own:0,enemy:0},gigT:6,view:"follow",pmode:"intro",mySpot:null,endT:0,lastPhase:"intro",seekerIdx:sk});
+  Object.assign(HS,{phase:"intro",introT:0,timer:45,lastTick:99,found:{own:0,enemy:0},gigT:6,view:"follow",pmode:"intro",mySpot:null,endT:0,lastPhase:"intro",seekerIdx:sk[0]});
   HS.gigs.forEach(g=>hsGroup.remove(g.s));HS.gigs=[];
   HS.spots.forEach(s=>{s.occupant=null;s.reserved=null;s.checked=false;s.open=0;s.openTarget=0;animSpot(s,0)});
   HS.glow.visible=false;HS.van.position.z=70;
   HS.chars.forEach(ch=>{Object.assign(ch,{path:[],anim:null,onArrive:null,state:"van",f:0,spot:null,vis:true,searchT:0,net:null,tgt:null});ch.c.rotation.set(0,PI,0);ch.c.scale.set(1,1,1)});
   G.fpYaw=0;G.fpPitch=-.05;G.playing=true;
-  const s=SEEKER();toast(`🚐 Here we are! ${s.idx===HS.me?"You are the seeker":s.name+(s.pname?` (${s.pname})`:"")+" is the seeker"} (${s.team==="blue"?"🔵 blue":"🔴 red"} team).`,3600);
+  const s=HS.chars[sk[0]],tn=s.team==="blue"?"🔵 BLUE":"🔴 RED";
+  if(HS.gmode==="team")toast(`🚐 Here we are! The ${tn} team is seeking. ${isSk(HS.me)?"You’re a seeker!":"You’re hiding!"}`,3800);
+  else toast(`🚐 Here we are! ${s.idx===HS.me?"You are the seeker":s.name+(s.pname?` (${s.pname})`:"")+" is the seeker"} (${tn} team).`,3600);
 }
 function doorSlot(i){return {x:2.4+(i%4)*.55,z:24+Math.floor(i/4)*.8}}
 function aiStand(ch){const s=HS.spots[Math.floor(Math.random()*HS.spots.length)];ch.state="toStand";ch.speed=4.4;ch.spot=null;const ox=(Math.random()-.5)*1.2;navTo(ch,s.n,[{x:s.ax+ox,z:s.az}]);ch.onArrive=()=>{if(ch.state==="toStand")ch.state="roam"}}
@@ -539,8 +548,8 @@ function aiHide(ch){const s=HS.spots.filter(q=>!q.reserved&&!q.occupant).sort(()
   navTo(ch,s.n,[{x:s.ax,z:s.az}]);ch.onArrive=()=>{if(s.occupant){s.reserved=null;aiHide(ch)}else enterSpot(ch,s)}}
 function beginHide(){
   HS.phase="hide";HS.timer=45;HS.lastTick=99;HS.van.position.z=26;
-  const sk=SEEKER();sk.vis=false;sk.state="van";
-  HS.chars.forEach(ch=>{if(ch===sk)return;const d=doorSlot(ch.idx);ch.c.position.set(d.x,0,d.z);ch.c.rotation.y=PI;ch.f=0;ch.vis=true;
+  SKS().forEach(sk=>{sk.vis=false;sk.state="van"});
+  HS.chars.forEach(ch=>{if(isSk(ch.idx))return;const d=doorSlot(ch.idx);ch.c.position.set(d.x,0,d.z);ch.c.rotation.y=PI;ch.f=0;ch.vis=true;
     if(ch.human)ch.state="roam";else if(Math.random()<.2&&HS.chars.filter(c=>c.state==="toStand").length<2)aiStand(ch);else aiHide(ch)});
   localPhase("hide");
 }
@@ -568,24 +577,24 @@ function seat(ch){const v=HS.van.position,s=SEATS[ch.idx];ch.c.position.set(v.x+
 function applyPose(ch){const u=ch.c.userData,sit=ch.state==="atVan"||HS.phase==="intro";u.belt.visible=ch.state==="atVan";if(sit){u.legs.forEach(l=>l.rotation.x=-1.45);u.arms.forEach(a=>a.rotation.x=-.35)}}
 function beginSeek(){
   HS.phase="seek";HS.timer=60;HS.lastTick=99;
-  HS.chars.forEach(ch=>{if(ch.idx===HS.seekerIdx||ch.state==="hidden"||ch.state==="entering")return;
+  HS.chars.forEach(ch=>{if(isSk(ch.idx)||ch.state==="hidden"||ch.state==="entering")return;
     if(ch.state==="toStand"){ch.path=[];ch.onArrive=null;ch.state="roam";return}
     if(ch.state==="roam"){say(ch,"⏰ Time’s up and you’re out in the open! Run, jump, and don’t let the seeker tag you!",3600);return}
     let s=ch.spot&&!ch.spot.occupant?ch.spot:null;
     if(!s){const p=ch.c.position;s=HS.spots.filter(q=>!q.occupant).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)+8*Math.abs(a.f-ch.f)-Math.hypot(b.x-p.x,b.z-p.z)-8*Math.abs(b.f-ch.f))[0]}
     enterSpot(ch,s,true)});
-  const sk=SEEKER();sk.c.position.set(2.6,0,24.5);sk.f=0;sk.c.rotation.y=PI;sk.vis=true;sk.state="seeking";sk.speed=4.4;sk.lungeT=0;sk.lungeCD=0;
+  SKS().forEach((sk,i)=>{sk.c.position.set(2.6+i*.7,0,24.5);sk.f=0;sk.c.rotation.y=PI;sk.vis=true;sk.state="seeking";sk.speed=4.4;sk.lungeT=0;sk.lungeCD=0;sk.path=[];sk.searchT=0});
   localPhase("seek");
 }
 function handleAct(ch,k,si){
   const s=HS.spots[si];if(!s||!ch)return;
   if(k==="hide"){
-    if(HS.phase!=="hide"||ch.state!=="roam"||ch.idx===HS.seekerIdx)return;
+    if(HS.phase!=="hide"||ch.state!=="roam"||isSk(ch.idx))return;
     if(s.occupant){say(ch,"Someone is already hiding there! 🤫");return}
     HS.chars.forEach(c=>{if(!c.human&&c.spot===s&&c.state==="toSpot"){s.reserved=null;aiHide(c)}});
     s.reserved=ch;enterSpot(ch,s);
   }else if(k==="search"){
-    if(HS.phase!=="seek"||ch.idx!==HS.seekerIdx||ch.searchT>0)return;
+    if(HS.phase!=="seek"||!isSk(ch.idx)||ch.searchT>0)return;
     ch.searchT=.7;ch.searchSpot=s;s.openTarget=1;
   }
 }
@@ -607,10 +616,10 @@ function foundChar(oc,by,where){
     if(HS.found.enemy>=4){HS.phase="ending";HS.endT=1.4;HS.endWhy="seekerWin"}else if(HS.found.own>=3){HS.phase="ending";HS.endT=1.4;HS.endWhy="ownOut"}
 }
 HS.closeT=[];
-function seekerAI(dt){
-  const sk=SEEKER();if(sk.anim)return;
+function seekerAI(sk,dt){
+  if(sk.anim)return;
   const p0=sk.c.position;
-  const prey=HS.chars.filter(c=>c.state==="roam"&&c!==sk&&Math.abs(c.c.position.y-p0.y)<1.6).map(c=>({c,d:Math.hypot(c.c.position.x-p0.x,c.c.position.z-p0.z)})).filter(o=>o.d<14&&los(p0.x,p0.z,o.c.c.position.x,o.c.c.position.z,sk.f)).sort((a,b)=>a.d-b.d)[0];
+  const prey=HS.chars.filter(c=>c.state==="roam"&&!isSk(c.idx)&&Math.abs(c.c.position.y-p0.y)<1.6).map(c=>({c,d:Math.hypot(c.c.position.x-p0.x,c.c.position.z-p0.z)})).filter(o=>o.d<14&&los(p0.x,p0.z,o.c.c.position.x,o.c.c.position.z,sk.f)).sort((a,b)=>a.d-b.d)[0];
   if(prey){sk.path=[];sk.onArrive=null;if(prey.d<4.5&&sk.lungeCD<=0){sk.lungeT=.35;sk.lungeCD=5;notifyAll({k:"snd",f:[220,440]})}walkTo(sk,prey.c.c.position.x,prey.c.c.position.z,sk.lungeT>0?14:5.3,dt);sk.mv=1;return}
   if(sk.path.length)return;
   const p=sk.c.position;const cand=HS.spots.filter(s=>!s.checked);if(!cand.length)return;
@@ -621,14 +630,14 @@ function seekerAI(dt){
   sk.onArrive=()=>{sk.c.rotation.y=Math.atan2(pick.x-sk.c.position.x,pick.z-sk.c.position.z);pick.openTarget=1;sk.searchT=1;sk.searchSpot=pick};
 }
 function giggle(){
-  const hid=HS.chars.filter(c=>c.state==="hidden"&&c.idx!==HS.seekerIdx);if(!hid.length)return;
+  const hid=HS.chars.filter(c=>c.state==="hidden"&&!isSk(c.idx));if(!hid.length)return;
   const ch=hid[Math.floor(Math.random()*hid.length)];notifyAll({k:"gig",s:HS.spots.indexOf(ch.spot),team:ch.team});
 }
 function endHS(reason){
   if(HS.phase==="end")return;HS.phase="end";
-  const sk=SEEKER(),st=sk.team,other=st==="blue"?"red":"blue",winner=reason==="seekerWin"?st:other;HS.wins[winner]++;
-  const n=sk.name+(sk.pname?` (${sk.pname})`:"");
-  const why=reason==="seekerWin"?`${n} found all 4 hiders on the other team!`:reason==="ownOut"?`${n} found all 3 of their own teammates, so their team loses!`:`Time’s up! ${n} ran out of time.`;
+  const sk=HS.chars[HS.seekers[0]],st=sk.team,other=st==="blue"?"red":"blue",winner=reason==="seekerWin"?st:other;HS.wins[winner]++;
+  const n=sk.name+(sk.pname?` (${sk.pname})`:""),tn=st==="blue"?"🔵 blue":"🔴 red",on=other==="blue"?"🔵 blue":"🔴 red";
+  const why=HS.gmode==="team"?(reason==="seekerWin"?`The ${tn} team found every hider!`:`Time’s up! The ${on} team stayed hidden.`):reason==="seekerWin"?`${n} found all 4 hiders on the other team!`:reason==="ownOut"?`${n} found all 3 of their own teammates, so their team loses!`:`Time’s up! ${n} ran out of time.`;
   sendSnap();notifyAll({k:"end",blue:winner==="blue",why,wins:HS.wins});
 }
 function hostUpdate(dt,t){
@@ -643,7 +652,7 @@ function hostUpdate(dt,t){
     if(ch.anim){runAnim(ch,dt);return}
     if(ch.state==="atVan"){seat(ch);animChar(ch.c,0,t,dt);applyPose(ch);return}
     if(HS.phase==="intro"){animChar(ch.c,0,t,dt);applyPose(ch);return}
-    if(!ch.human&&ch.state==="roam"&&HS.phase==="seek"){const sk=SEEKER(),p=ch.c.position,q=sk.c.position,d=Math.hypot(p.x-q.x,p.z-q.z);ch.mv=0;
+    if(!ch.human&&ch.state==="roam"&&HS.phase==="seek"){const p=ch.c.position,sk=nearestSk(p.x,p.z,p.y),q=sk.c.position,d=Math.hypot(p.x-q.x,p.z-q.z);ch.mv=0;
       if(sk.vis&&d<8&&Math.abs(p.y-q.y)<1.6&&los(p.x,p.z,q.x,q.z,ch.f)){const ax=(p.x-q.x)/(d||1),az=(p.z-q.z)/(d||1);walkTo(ch,p.x+ax*4+az*1.5,p.z+az*4-ax*1.5,4.9,dt);ch.mv=1}
       animChar(ch.c,ch.mv,t*1.2,dt);return}
     const ctrl=ch.human&&(ch.state==="roam"||ch.state==="seeking");
@@ -651,22 +660,22 @@ function hostUpdate(dt,t){
     if(!ch.vis)return;
     if(ch.path.length){const p=ch.path[0];const d=walkTo(ch,p.x,p.z,ch.speed,dt);if(d<.35){ch.path.shift();if(!ch.path.length&&ch.onArrive){const f=ch.onArrive;ch.onArrive=null;f()}}animChar(ch.c,1,t*1.15,dt)}
     else{animChar(ch.c,ch.mv||0,t*1.1,dt);ch.mv=Math.max(0,(ch.mv||0)-dt*4)}});
-  if(HS.phase==="seek"){const sk=SEEKER();
-    if(sk.vis&&sk.state==="seeking"&&!sk.anim){HS.chars.forEach(c=>{if(c===sk||c.state!=="roam")return;const dy=c.c.position.y-sk.c.position.y;if(dy>1.15||dy<-1.6)return;if(Math.hypot(c.c.position.x-sk.c.position.x,c.c.position.z-sk.c.position.z)<1.3)foundChar(c,sk,"out in the open")})}
-    if(sk.searchT>0){sk.searchT-=dt;if(sk.searchT<=0)resolveSearch(sk.searchSpot,sk)}
-    else if(!sk.human)seekerAI(dt);
+  if(HS.phase==="seek"){SKS().forEach(sk=>{
+    if(sk.vis&&sk.state==="seeking"&&!sk.anim){HS.chars.forEach(c=>{if(isSk(c.idx)||c.state!=="roam")return;const dy=c.c.position.y-sk.c.position.y;if(dy>1.15||dy<-1.6)return;if(Math.hypot(c.c.position.x-sk.c.position.x,c.c.position.z-sk.c.position.z)<1.3)foundChar(c,sk,"out in the open")})}
+    if(sk.searchT>0){sk.searchT-=dt;if(sk.searchT<=0&&HS.phase==="seek")resolveSearch(sk.searchSpot,sk)}
+    else if(!sk.human)seekerAI(sk,dt)});
     HS.gigT-=dt;if(HS.gigT<=0){HS.gigT=5+Math.random()*4;giggle()}}
   for(let i=HS.closeT.length-1;i>=0;i--){const c=HS.closeT[i];c.t-=dt;if(c.t<=0){c.s.openTarget=0;HS.closeT.splice(i,1)}}
   NET.snapT-=dt;if(NET.snapT<=0){NET.snapT=.1;sendSnap()}
 }
 function sendSnap(){
   if(NET.mode!=="host"||!Object.keys(NET.conns).length)return;
-  broadcast({t:"s",ph:HS.phase,tm:+HS.timer.toFixed(2),vz:+HS.van.position.z.toFixed(2),sk:HS.seekerIdx,fd:[HS.found.own,HS.found.enemy],
+  broadcast({t:"s",ph:HS.phase,tm:+HS.timer.toFixed(2),vz:+HS.van.position.z.toFixed(2),sk:HS.seekers,gm:HS.gmode,fd:[HS.found.own,HS.found.enemy],
     c:HS.chars.map(ch=>{const p=ch.c.position;return [+p.x.toFixed(2),+p.y.toFixed(2),+p.z.toFixed(2),+ch.c.rotation.y.toFixed(2),+ch.c.rotation.x.toFixed(2),+ch.c.scale.y.toFixed(2),ch.vis?1:0,ch.f,ch.state]}),
     o:HS.spots.reduce((a,s,i)=>{if(s.openTarget>0)a.push(i);return a},[])});
 }
 function applySnap(m){
-  HS.timer=m.tm;HS.van.position.z=m.vz;HS.seekerIdx=m.sk;HS.found={own:m.fd[0],enemy:m.fd[1]};
+  HS.timer=m.tm;HS.van.position.z=m.vz;HS.seekers=Array.isArray(m.sk)?m.sk:[m.sk];HS.seekerIdx=HS.seekers[0];HS.gmode=m.gm||"classic";HS.found={own:m.fd[0],enemy:m.fd[1]};
   m.c.forEach((a,i)=>{const ch=HS.chars[i];ch.tgt={x:a[0],y:a[1],z:a[2],ry:a[3],rx:a[4],sy:a[5]};ch.vis=!!a[6];if(!(i===HS.me&&HS.pmode==="fp"))ch.f=a[7];ch.state=a[8]});
   const open=new Set(m.o);HS.spots.forEach((s,i)=>s.openTarget=open.has(i)?1:0);
   if(m.ph!==HS.phase){HS.phase=m.ph;if(m.ph==="hide"||m.ph==="seek")localPhase(m.ph)}
@@ -685,17 +694,17 @@ HS.dh={dist:26};HS.cutMode="full";
 function localPhase(ph){
   const me=ME();
   if(ph==="hide"){
-    if(HS.seekerIdx===HS.me){HS.pmode="van";G.fpYaw=0;G.fpPitch=-.05;toast("🙈 You’re the seeker! Close your eyes and count. Everyone is running to hide…",3600)}
+    if(isSk(HS.me)){HS.pmode="van";G.fpYaw=0;G.fpPitch=-.05;toast(HS.gmode==="team"?"🙈 Your team is seeking! Close your eyes and count…":"🙈 You’re the seeker! Close your eyes and count. Everyone is running to hide…",3600)}
     else{HS.pmode="fp";const d=doorSlot(HS.me);me.c.position.set(d.x,0,d.z);me.f=0;me.jh=0;me.jv=0;G.fpYaw=0;G.fpPitch=-.05;toast(`🏃 You’re on the ${me.team==="blue"?"🔵 BLUE":"🔴 RED"} team! 45 seconds: hide in something, or just find a sneaky place to stand.`,4200)}
     chime([784,988,1175],.08,.3);
   }else if(ph==="seek"){
-    if(HS.seekerIdx===HS.me){HS.pmode="fp";me.c.position.set(2.6,0,24.5);me.f=0;G.fpYaw=0;G.fpPitch=-.05;HS.lungeCD=0;HS.lungeT=0;toast(`🔍 Ready or not! Find all 4 on the ${me.team==="blue"?"🔴 red":"🔵 blue"} team, but don’t find all 3 of your teammates! Tag anyone out in the open. ⚡ Lunge to catch them.`,4800)}
-    else{const s=SEEKER();if(HS.pmode!=="fp")toast(`🔍 Ready or not! ${s.name}${s.pname?` (${s.pname})`:""} is coming…`,3000)}
+    if(isSk(HS.me)){HS.pmode="fp";me.c.position.set(2.6+HS.seekers.indexOf(HS.me)*.7,0,24.5);me.f=0;G.fpYaw=0;G.fpPitch=-.05;HS.lungeCD=0;HS.lungeT=0;toast(HS.gmode==="team"?`🔍 Go team! Find all 4 hiders on the ${me.team==="blue"?"🔴 red":"🔵 blue"} team before time runs out. ⚡ Lunge to tag anyone out in the open!`:`🔍 Ready or not! Find all 4 on the ${me.team==="blue"?"🔴 red":"🔵 blue"} team, but don’t find all 3 of your teammates! Tag anyone out in the open. ⚡ Lunge to catch them.`,4800)}
+    else{const s=HS.chars[HS.seekers[0]];if(HS.pmode!=="fp")toast(HS.gmode==="team"?`🔍 Ready or not! The ${s.team==="blue"?"🔵 blue":"🔴 red"} team is coming…`:`🔍 Ready or not! ${s.name}${s.pname?` (${s.pname})`:""} is coming…`,3000)}
     chime([523,659,784,1047],.08,.35);
   }
 }
-function hsJump(){const me=ME();if(HS.pmode!=="fp"||HS.seekerIdx===HS.me||(me.jh||0)>.01)return;me.jv=7.6;tone(660,ac?ac.currentTime:0,.1,"triangle",.06)}
-function hsLunge(){if(HS.pmode!=="fp"||HS.seekerIdx!==HS.me||HS.phase!=="seek"||HS.lungeCD>0)return;HS.lungeT=.32;HS.lungeCD=5;if(ac){tone(220,ac.currentTime,.12,"sawtooth",.07);tone(440,ac.currentTime+.05,.15,"triangle",.07)}}
+function hsJump(){const me=ME();if(HS.pmode!=="fp"||isSk(HS.me)||(me.jh||0)>.01)return;me.jv=7.6;tone(660,ac?ac.currentTime:0,.1,"triangle",.06)}
+function hsLunge(){if(HS.pmode!=="fp"||!isSk(HS.me)||HS.phase!=="seek"||HS.lungeCD>0)return;HS.lungeT=.32;HS.lungeCD=5;if(ac){tone(220,ac.currentTime,.12,"sawtooth",.07);tone(440,ac.currentTime+.05,.15,"triangle",.07)}}
 function localUpdate(dt,t){
   const me=ME(),pm=HS.pmode;
   if(HS.lungeCD>0)HS.lungeCD-=dt;
@@ -703,14 +712,14 @@ function localUpdate(dt,t){
     let ix=0,iz=0;if(keys["a"])ix-=1;if(keys["d"])ix+=1;if(keys["w"]||keys["arrowup"])iz+=1;if(keys["s"]||keys["arrowdown"])iz-=1;
     if(keys["arrowleft"])G.fpYaw+=2.2*dt;if(keys["arrowright"])G.fpYaw-=2.2*dt;
     if(joy.id!==null){ix+=joy.x;iz-=joy.y}const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}
-    const y=G.fpYaw,fx=-Math.sin(y),fz=-Math.cos(y),rx=Math.cos(y),rz=-Math.sin(y),sp=HS.seekerIdx===HS.me?6:5.5;
+    const y=G.fpYaw,fx=-Math.sin(y),fz=-Math.cos(y),rx=Math.cos(y),rz=-Math.sin(y),sp=isSk(HS.me)?6:5.5;
     if(HS.lungeT>0){HS.lungeT-=dt;hsStep(me,fx*18*dt,fz*18*dt);HS.bob=(HS.bob||0)+dt*14}
     else if(il>.05){hsStep(me,(fx*iz+rx*ix)*sp*dt,(fz*iz+rz*ix)*sp*dt);HS.bob=(HS.bob||0)+dt*9*Math.min(1,il)}
     me.jv=(me.jv||0)-20*dt;me.jh=Math.max(0,(me.jh||0)+me.jv*dt);if(me.jh<=0)me.jv=0;
     me.c.position.y=settleY(me)+me.jh;
     me.c.rotation.y=y+PI;
     const p=me.c.position;let best=null,bs=.72;
-    if(HS.phase==="hide"||HS.seekerIdx===HS.me)for(const s of HS.spots){if(s.f!==me.f)continue;const ddx=s.x-p.x,ddz=s.z-p.z,d=Math.hypot(ddx,ddz);if(d>s.reach)continue;const dot=d<.6?1:(ddx*fx+ddz*fz)/d;if(dot<bs)continue;if(!los(p.x,p.z,s.ax,s.az,me.f))continue;bs=dot;best=s}
+    if(HS.phase==="hide"||isSk(HS.me))for(const s of HS.spots){if(s.f!==me.f)continue;const ddx=s.x-p.x,ddz=s.z-p.z,d=Math.hypot(ddx,ddz);if(d>s.reach)continue;const dot=d<.6?1:(ddx*fx+ddz*fz)/d;if(dot<bs)continue;if(!los(p.x,p.z,s.ax,s.az,me.f))continue;bs=dot;best=s}
     HS.look=best;
     if(NET.mode==="client"){NET.inT-=dt;if(NET.inT<=0){NET.inT=.1;sendHost({t:"in",x:+p.x.toFixed(2),y:+p.y.toFixed(2),z:+p.z.toFixed(2),ry:+me.c.rotation.y.toFixed(2),f:me.f})}}
   }else HS.look=null;
@@ -724,15 +733,15 @@ function localUpdate(dt,t){
   const doll=(pm==="ghost"||pm==="spectate")&&(HS.view==="doll"||HS.view==="dollme");
   let cut="full";if(doll){const tf=HS.view==="dollme"&&HS.mySpot?HS.mySpot.f:(SEEKER()&&SEEKER().vis?(SEEKER().c.position.y>2.5?1:0):0);cut=tf===1?"noroof":"ground"}
   if(cut!==HS.cutMode){HS.cutMode=cut;HS.roofObjs.forEach(o=>o.visible=cut==="full");HS.upperObjs.forEach(o=>o.visible=cut!=="ground")}
-  const sk=SEEKER();HS.marker.visible=doll&&sk&&sk.vis;if(HS.marker.visible){HS.marker.position.set(sk.c.position.x,sk.c.position.y+4+Math.sin(t*4)*.3,sk.c.position.z)}
+  HS.markers.forEach((mk,i)=>{const s=HS.chars[HS.seekers[i]];mk.visible=!!(doll&&s&&s.vis&&HS.phase==="seek");if(mk.visible)mk.position.set(s.c.position.x,s.c.position.y+4+Math.sin(t*4+i)*.3,s.c.position.z)});
   HS.chars.forEach(ch=>ch.c.visible=ch.vis&&!(ch.idx===HS.me&&(pm==="fp"||pm==="van"))&&!(cut==="ground"&&ch.c.position.y>3.5));
   hsHUD();
 }
 function hsAction(){
   if(!G.playing)return;
   if(HS.pmode!=="fp"||!HS.look)return;const si=HS.spots.indexOf(HS.look);
-  if(HS.phase==="hide"&&HS.seekerIdx!==HS.me)sendHost({t:"act",k:"hide",s:si});
-  else if(HS.phase==="seek"&&HS.seekerIdx===HS.me){sendHost({t:"act",k:"search",s:si});tone(520,ac?ac.currentTime:0,.15,"triangle",.06)}
+  if(HS.phase==="hide"&&!isSk(HS.me))sendHost({t:"act",k:"hide",s:si});
+  else if(HS.phase==="seek"&&isSk(HS.me)){sendHost({t:"act",k:"search",s:si});tone(520,ac?ac.currentTime:0,.15,"triangle",.06)}
 }
 const hsCamPos=new THREE.Vector3(),hsLook=new THREE.Vector3();
 function hsCamera(dt){
@@ -762,11 +771,11 @@ function hsHUD(){
   const tm=Math.max(0,Math.ceil(HS.timer)),mm=Math.floor(tm/60),ss=String(tm%60).padStart(2,"0");
   const el=$("#hsTimer");const txt=HS.phase==="intro"?"🚐 Driving…":`⏱ ${mm}:${ss}`;if(el.textContent!==txt)el.textContent=txt;
   el.classList.toggle("hurry",(HS.phase==="hide"||HS.phase==="seek")&&tm<=10);
-  const sk=SEEKER(),me=ME(),amSeeker=HS.seekerIdx===HS.me;let ph="";
-  if(HS.phase==="hide")ph=amSeeker?"🙈 Counting in the van…":"🙈 Hide!";else if(HS.phase==="seek")ph=`🔍 ${amSeeker?"You are":sk.name+" is"} seeking`;
+  const sk=SEEKER(),me=ME(),amSeeker=isSk(HS.me);let ph="";const s0=HS.chars[HS.seekers[0]];
+  if(HS.phase==="hide")ph=amSeeker?"🙈 Counting in the van…":"🙈 Hide!";else if(HS.phase==="seek")ph=HS.gmode==="team"?`🔍 ${s0.team==="blue"?"🔵 Blue":"🔴 Red"} team is seeking`:`🔍 ${amSeeker?"You are":s0.name+" is"} seeking`;
   $("#hsPhase").textContent=ph;
   const badge=$("#hsMe"),bt=`${me.team==="blue"?"🔵 BLUE":"🔴 RED"} team · ${me.name}${amSeeker?" · 🔍 Seeker":" · 🙈 Hider"}`;if(badge.textContent!==bt){badge.textContent=bt;badge.className=me.team}
-  $("#hsFound").textContent=HS.phase==="seek"&&sk?`Found: other team ${HS.found.enemy}/4, own team ${HS.found.own}/3`:"";
+  $("#hsFound").textContent=HS.phase==="seek"&&sk?(HS.gmode==="team"?`Hiders found: ${HS.found.enemy}/4`:`Found: other team ${HS.found.enemy}/4, own team ${HS.found.own}/3`):"";
   $("#hsNet").textContent=NET.mode==="solo"?"":`🌐 Code ${NET.code}`;
   const cnt=$("#hsCount");const showCnt=HS.pmode==="van"&&HS.phase==="hide";cnt.hidden=!showCnt;if(showCnt)cnt.textContent=`🙈 Counting… ${tm}`;
   const meter=$("#hsMeter"),showM=HS.pmode==="ghost"&&HS.mySpot&&HS.phase==="seek"&&sk&&sk.vis;meter.hidden=!showM;
@@ -794,14 +803,15 @@ function handleEv(ev){
   else if(ev.k==="entering"){HS.pmode="cut";HS.cutSpot=HS.spots[ev.s]}
   else if(ev.k==="hidden"){const s=HS.spots[ev.s];HS.pmode="ghost";HS.view="dollme";HS.dh.dist=24;G.fpPitch=0;HS.mySpot=s;HS.glow.visible=true;HS.glow.scale.set(s.w+.4,s.h+.4,s.d+.4);HS.glow.position.set(s.x,s.f*4+s.h/2,s.z);HS.glow.rotation.y=Math.atan2(s.fx,s.fz);chime([659,880],.08,.3);toast(`🙈 You’re hiding ${s.verb} the ${s.name}! Spin and zoom the dollhouse to watch the seeker.`,3400)}
   else if(ev.k==="found"){HS.pmode="walkVan";HS.snap=true;HS.glow.visible=false;chime([392,330,262],.12,.35,"triangle",.1);toast(`😱 ${ev.by} found you! Heading back to the van…`,2800)}
-  else if(ev.k==="seated"){HS.pmode="spectate";HS.view="van";HS.viewsKey="";chime([523,659],.08,.25);toast("🚐 Seatbelt on! You can still watch: tap Dollhouse or Seeker.",3200);if(HS.phase==="seek")$("#hsRole").hidden=false}
+  else if(ev.k==="seated"){HS.pmode="spectate";HS.view="van";HS.viewsKey="";chime([523,659],.08,.25);toast("🚐 Seatbelt on! You can still watch: tap Dollhouse or Seeker.",3200);if(HS.phase==="seek"&&HS.gmode!=="team")$("#hsRole").hidden=false}
   else if(ev.k==="gig"){const s=HS.spots[ev.s];if(!s)return;const sp=label("hehe! 🤭",TEAM[ev.team].label);sp.position.set(s.x,s.f*4+s.h+.9,s.z);sp.scale.set(2.2,.55,1);hsAdd(sp);HS.gigs.push({s:sp,t:2.2});
-    const me=ME();if(HS.seekerIdx===HS.me&&me.f===s.f&&ac){const d=Math.hypot(me.c.position.x-s.x,me.c.position.z-s.z);if(d<22)tone(1400+Math.random()*300,ac.currentTime,.25,"sine",.08*(1-d/22))}}
+    const me=ME();if(isSk(HS.me)&&me.f===s.f&&ac){const d=Math.hypot(me.c.position.x-s.x,me.c.position.z-s.z);if(d<22)tone(1400+Math.random()*300,ac.currentTime,.25,"sine",.08*(1-d/22))}}
   else if(ev.k==="end"){HS.phase="end";G.playing=true;$("#hsRole").hidden=true;if(ev.blue===(ME().team==="blue")){confetti(50);chime([523,659,784,1047,1319],.1,.45)}else chime([523,494,440,392],.15,.4,"triangle",.1);HS.wins=ev.wins;setTimeout(()=>showResults(ev),1200)}
 }
 function showResults(ev){
   const host=isHost();
-  showScreen(`<span class="script byline">Hide and Seek</span><h1>${ev.blue?"🔵 Blue team wins!":"🔴 Red team wins!"}</h1><p>${ev.why}</p><p><b>Rounds won: 🔵 ${ev.wins.blue} – ${ev.wins.red} 🔴</b></p><p>Next round I want to be:</p><div class="row2"><button class="big" data-pref="hider">🙈 Hider</button><button class="big" data-pref="seeker" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔍 Seeker</button></div><p class="status" id="prefStatus"></p>${host?`<div class="row2"><button class="big" id="nextRound" style="background:#2BCB8B;box-shadow:0 6px 0 #1E9466">▶️ Next round</button></div><div class="row2"><button class="ghostbtn" id="toLobby">${NET.mode==="host"?"Back to the lobby":"Main menu"}</button></div>`:`<p>Waiting for the host to start the next round…</p>`}`);
+  const team=HS.gmode==="team";
+  showScreen(`<span class="script byline">Hide and Seek</span><h1>${ev.blue?"🔵 Blue team wins!":"🔴 Red team wins!"}</h1><p>${ev.why}</p><p><b>Rounds won: 🔵 ${ev.wins.blue} – ${ev.wins.red} 🔴</b></p>${team?"":`<p>Next round I want to be:</p><div class="row2"><button class="big" data-pref="hider">🙈 Hider</button><button class="big" data-pref="seeker" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔍 Seeker</button></div><p class="status" id="prefStatus"></p>`}${host?(team?`<p><b>Next round, who seeks?</b></p><div class="row2"><button class="big" data-nextteam="red" style="background:#FF5E5E;box-shadow:0 6px 0 #C93E3E">🔴 Red seeks</button><button class="big" data-nextteam="blue" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔵 Blue seeks</button></div>`:`<div class="row2"><button class="big" id="nextRound" style="background:#2BCB8B;box-shadow:0 6px 0 #1E9466">▶️ Next round</button></div>`)+`<div class="row2"><button class="ghostbtn" id="toLobby">${NET.mode==="host"?"Back to the lobby":"Main menu"}</button></div>`:`<p>Waiting for the host to start the next round…</p>`}`);
 }
 /* ---------- host message handling ---------- */
 function onHostMsg(id,m){
@@ -814,7 +824,7 @@ function onHostMsg(id,m){
   else if(m.t==="in"){const ch=HS.chars.find(c=>c.human===id);if(ch)ch.net=m}
   else if(m.t==="act"){const ch=HS.chars.find(c=>c.human===id);handleAct(ch,m.k,m.s)}
 }
-function pushLobby(){const l={t:"lobby",players:NET.players.map(p=>({id:p.id,name:p.name,idx:p.idx,seek:p.seek,look:p.look||null})),code:NET.code};broadcast(l);NET.lobby=l;if(HS.phase==="lobby")renderLobby()}
+function pushLobby(){const l={t:"lobby",cfg:NET.cfg,players:NET.players.map(p=>({id:p.id,name:p.name,idx:p.idx,seek:p.seek,look:p.look||null})),code:NET.code};broadcast(l);NET.lobby=l;if(HS.phase==="lobby")renderLobby()}
 function dropPlayer(id){
   NET.players=NET.players.filter(p=>p.id!==id);delete NET.conns[id];
   const ch=HS.chars.find(c=>c.human===id);
@@ -853,7 +863,7 @@ function joinGame(){
 function netErr(e){return e.type==="peer-unavailable"?"No game found with that code. Check the code and try again.":e.type==="network"||e.type==="server-error"||e.type==="socket-error"?"Can’t reach the game server. Check your internet and try again.":e.type==="browser-incompatible"?"This browser can’t play online. Try Chrome or Safari.":"Something went wrong connecting. Try again."}
 function onClientMsg(m){
   if(m.t==="lobby"){NET.lobby=m;if(HS.phase==="lobby")renderLobby()}
-  else if(m.t==="start"){startRound(m.sk,m.map)}
+  else if(m.t==="start"){startRound(m.sk,m.map,m.mode)}
   else if(m.t==="s")applySnap(m);
   else if(m.t==="ev")handleEv(m);
   else if(m.t==="tolobby"){HS.phase="lobby";G.playing=false;renderLobby()}
@@ -867,8 +877,11 @@ function renderLobby(){
   const mine=L.players.find(p=>p.id===NET.myId)||{};const host=isHost();
   const chars=HS_ROSTER.map((r,i)=>{const owner=L.players.find(p=>p.idx===i);const me=owner&&owner.id===NET.myId;return `<button class="charbtn ${r.team}${me?" mine":""}" data-pick="${i}" ${owner&&!me?"disabled":""}><b>${r.name}</b><span>${me?"⭐ You":owner?esc(owner.name):"🤖 Computer"}</span></button>`}).join("");
   const head=NET.mode==="solo"?`<h1>Play solo</h1><p>Pick your character. The computer plays everyone else.</p>`:`<h1>Code: <span class="code">${L.code}</span></h1><p>Friends tap “Join a game” and type this code.</p><div class="row2"><button class="ghostbtn" id="inviteBtn">📤 Share invite link</button></div>`;
-  showScreen(`<span class="script byline">Hide and Seek Online</span>${head}<p><b>Pick your character</b> (🔵 blue team on top, 🔴 red team below):</p><div class="chargrid">${chars}</div>${mine.idx>=0?`<div class="row2"><button class="big" id="editBtn" style="background:#8E6CFF;box-shadow:0 6px 0 #6B3FD1">✏️ Edit my avatar</button></div>`:""}<label class="seekpref"><input type="checkbox" id="seekPref" ${mine.seek?"checked":""}> I want to be the seeker</label>${NET.mode!=="solo"?`<p class="who">${L.players.length} ${L.players.length===1?"player":"players"} here: ${L.players.map(p=>esc(p.name)).join(", ")}</p>`:""}${host?`<button class="big" id="startBtn">▶️ Start the game</button><p class="who">Empty spots are played by the computer.</p>`:`<p><b>Waiting for the host to start…</b></p>`}<div class="row2"><button class="ghostbtn" id="leaveBtn">Leave</button></div>`);
+  showScreen(`<span class="script byline">Hide and Seek Online</span>${head}<p><b>Pick your character</b> (🔵 blue team on top, 🔴 red team below):</p><div class="chargrid">${chars}</div>${gameTypeHTML(L,host)}${mine.idx>=0?`<div class="row2"><button class="big" id="editBtn" style="background:#8E6CFF;box-shadow:0 6px 0 #6B3FD1">✏️ Edit my avatar</button></div>`:""}${(L.cfg||NET.cfg).mode==="team"?"":`<label class="seekpref"><input type="checkbox" id="seekPref" ${mine.seek?"checked":""}> I want to be the seeker</label>`}${NET.mode!=="solo"?`<p class="who">${L.players.length} ${L.players.length===1?"player":"players"} here: ${L.players.map(p=>esc(p.name)).join(", ")}</p>`:""}${host?`<button class="big" id="startBtn">▶️ Start the game</button><p class="who">Empty spots are played by the computer.</p>`:`<p><b>Waiting for the host to start…</b></p>`}<div class="row2"><button class="ghostbtn" id="leaveBtn">Leave</button></div>`);
 }
+function gameTypeHTML(L,host){const c=L.cfg||NET.cfg;
+  if(!host)return `<p class="who"><b>Game:</b> ${c.mode==="team"?`👥 Team vs team, ${c.seekTeam==="red"?"🔴 red":"🔵 blue"} team seeks`:"👤 One seeker"}</p>`;
+  return `<p><b>Game type</b></p><div class="ed-chips gtype"><button data-gmode="classic" class="${c.mode==="classic"?"on":""}">👤 One seeker</button><button data-gmode="team" class="${c.mode==="team"?"on":""}">👥 Team vs team (4 v 4)</button></div>${c.mode==="team"?`<p><b>Which team seeks?</b></p><div class="ed-chips gtype"><button data-steam="red" class="${c.seekTeam==="red"?"on":""}">🔴 Red team seeks</button><button data-steam="blue" class="${c.seekTeam==="blue"?"on":""}">🔵 Blue team seeks</button></div>`:""}`}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function showMenu(){
   let nm="";try{nm=localStorage.getItem("hsName")||""}catch(e){}
@@ -884,6 +897,9 @@ document.addEventListener("click",e=>{
   if(t.closest("#leaveBtn")){leave();return}
   const pk=t.closest("[data-pick]");if(pk){const i=+pk.dataset.pick;sendHost({t:"pick",idx:i,look:loadLook(i)});if(isHost())renderLobby();return}
   if(t.closest("#startBtn")){audioOn();HS.wins={blue:0,red:0};hostStartRound();return}
+  const gm=t.closest("[data-gmode]");if(gm&&isHost()){NET.cfg.mode=gm.dataset.gmode;pushLobby();renderLobby();return}
+  const stm=t.closest("[data-steam]");if(stm&&isHost()){NET.cfg.seekTeam=stm.dataset.steam;pushLobby();renderLobby();return}
+  const nt=t.closest("[data-nextteam]");if(nt&&isHost()){NET.cfg.seekTeam=nt.dataset.nextteam;audioOn();hostStartRound();return}
   if(t.closest("#nextRound")){audioOn();hostStartRound();return}
   if(t.closest("#toLobby")){if(NET.mode==="host"){broadcast({t:"tolobby"});HS.phase="lobby";G.playing=false;renderLobby()}else leave();return}
   const pf=t.closest("[data-pref]");if(pf){const seek=pf.dataset.pref==="seeker";sendHost({t:"pref",seek});const st=$("#prefStatus");if(st)st.textContent=seek?"🔍 You asked to be the seeker.":"🙈 You’ll hide next round.";return}
@@ -947,9 +963,8 @@ document.addEventListener("click",e=>{
 hsGroup.updateMatrixWorld(true);
 HS.roofObjs=[];HS.upperObjs=[];
 (function(){const b=new THREE.Box3();hsGroup.children.slice().forEach(o=>{if(o===HS.van||o===HS.glow||HS.chars.some(c=>c.c===o))return;b.setFromObject(o);if(b.min.y>=7.9)HS.roofObjs.push(o);else if(b.min.y>=3.6)HS.upperObjs.push(o)})})();
-HS.marker=new THREE.Group();
-(function(){const mc=M(new THREE.ConeGeometry(.7,1.4,16),new THREE.MeshBasicMaterial({color:"#FF2D55",depthTest:false,transparent:true}));mc.rotation.x=PI;mc.renderOrder=999;HS.marker.add(mc);const ml=label("🔍 Seeker","#FFD3D3");ml.material.depthTest=false;ml.renderOrder=999;ml.position.y=1.5;ml.scale.set(3,.75,1);HS.marker.add(ml)})();
-HS.marker.visible=false;hsAdd(HS.marker);
+HS.markers=[];
+for(let i=0;i<4;i++){const mk=new THREE.Group();const mc=M(new THREE.ConeGeometry(.7,1.4,16),new THREE.MeshBasicMaterial({color:"#FF2D55",depthTest:false,transparent:true}));mc.rotation.x=PI;mc.renderOrder=999;mk.add(mc);const ml=label("🔍 Seeker","#FFD3D3");ml.material.depthTest=false;ml.renderOrder=999;ml.position.y=1.5;ml.scale.set(3,.75,1);mk.add(ml);mk.visible=false;hsAdd(mk);HS.markers.push(mk)}
 hsGroup.visible=true;HS.chars.forEach(ch=>ch.c.visible=false);HS.van.position.z=40;HS.phase="menu";
 
 /* ---------- helpers ---------- */
@@ -971,20 +986,20 @@ addEventListener("keydown",e=>{if(e.target&&e.target.tagName==="INPUT")return;co
   if(k===" "||k.startsWith("arrow"))e.preventDefault();
   if(k===" "&&!e.repeat)hsJump();if(k==="shift")hsLunge();if(k==="e")hsAction()});
 addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false});
-let camDrag=null;const touches=new Map();let pinchD=0;
+let camDrag=null;const touches=new Map();let pinchD=0,pinching=false;
 canvas.addEventListener("pointerdown",e=>{
   if(e.pointerType!=="mouse")touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(touches.size===2){camDrag=null;const [a,b]=[...touches.values()];pinchD=Math.hypot(a.x-b.x,a.y-b.y);return}
+  if(touches.size===2&&HS.pmode!=="fp"&&joy.id===null){pinching=true;camDrag=null;const [a,b]=[...touches.values()];pinchD=Math.hypot(a.x-b.x,a.y-b.y);return}
   if(HS.pmode==="fp"&&e.pointerType!=="mouse"&&e.clientX<innerWidth*.5&&joy.id===null){joy.id=e.pointerId;joy.ox=e.clientX;joy.oy=e.clientY;joy.x=joy.y=0;const j=$("#joy");j.style.left=e.clientX+"px";j.style.top=e.clientY+"px";j.style.display="block";$("#knob").style.transform="";canvas.setPointerCapture(e.pointerId);return}
   camDrag={id:e.pointerId,x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener("pointermove",e=>{
   if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(touches.size===2&&e.pointerId!==joy.id){const [a,b]=[...touches.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinchD>0){HS.dh.dist=Math.max(8,Math.min(70,HS.dh.dist*pinchD/d))}pinchD=d;return}
+  if(pinching&&touches.size===2){const [a,b]=[...touches.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinchD>0){HS.dh.dist=Math.max(8,Math.min(70,HS.dh.dist*pinchD/d))}pinchD=d;return}
   if(e.pointerId===joy.id){let dx=e.clientX-joy.ox,dy=e.clientY-joy.oy;const d=Math.hypot(dx,dy),max=55;if(d>max){dx*=max/d;dy*=max/d}joy.x=dx/max;joy.y=dy/max;$("#knob").style.transform=`translate(${dx}px,${dy}px)`;return}
   if(camDrag&&e.pointerId===camDrag.id){G.fpYaw-=(e.clientX-camDrag.x)*.006;G.fpPitch=Math.max(-1.2,Math.min(1.1,G.fpPitch-(e.clientY-camDrag.y)*.005));camDrag.x=e.clientX;camDrag.y=e.clientY}
 });
-function endPtr(e){touches.delete(e.pointerId);if(touches.size<2)pinchD=0;if(e.pointerId===joy.id){joy.id=null;joy.x=joy.y=0;$("#joy").style.display="none"}if(camDrag&&e.pointerId===camDrag.id)camDrag=null}
+function endPtr(e){touches.delete(e.pointerId);if(touches.size<2){pinchD=0;pinching=false}if(e.pointerId===joy.id){joy.id=null;joy.x=joy.y=0;$("#joy").style.display="none"}if(camDrag&&e.pointerId===camDrag.id)camDrag=null}
 canvas.addEventListener("pointerup",endPtr);canvas.addEventListener("pointercancel",endPtr);
 canvas.addEventListener("wheel",e=>{e.preventDefault();HS.dh.dist=Math.max(8,Math.min(70,HS.dh.dist*(e.deltaY>0?1.1:.9)))},{passive:false});
 $("#hsJump").addEventListener("pointerdown",e=>{e.preventDefault();hsJump()});
