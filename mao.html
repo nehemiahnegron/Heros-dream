@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mao</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --bg:#dfe7e2; --panel:#f7faf8; --ink:#1b1a17; --muted:#5d665f; --line:#c3cfc7;
+  --chip:#ffffff; --chipink:#1b1a17; --accent:#2a63c9; --accentink:#ffffff;
+  --cardbg:#fffdf6; --cardink:#1b1a17; --cardred:#c62f28;
+  --mao:#ffd23f; --maoink:#1b1a17; --pen:#e2462f; --penink:#ffffff;
+  --bubble:#ffffff; --bubbleink:#1b1a17; --overlay:rgba(8,10,9,.66); --hud:rgba(0,0,0,.55); --hudink:#ffffff;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1612; --panel:#24201b; --ink:#f3eee4; --muted:#a99f90; --line:#3d362d;
+    --chip:#2e2922; --chipink:#f3eee4; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1612; --panel:#24201b; --ink:#f3eee4; --muted:#a99f90; --line:#3d362d;
+  --chip:#2e2922; --chipink:#f3eee4; color-scheme:dark;
+}
+html{height:100%}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+*,*::before,*::after{box-sizing:border-box}
+button{font-family:inherit;cursor:pointer;color:inherit}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;position:relative}
+
+#hdr{display:flex;align-items:center;gap:8px;padding:6px 10px 2px}
+#scores{display:flex;gap:10px;font-size:14px;font-weight:600;flex:1;flex-wrap:wrap}
+#scores .rd{color:var(--muted);font-weight:500}
+#helpBtn{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--panel);font-weight:700}
+
+#mod{display:flex;align-items:center;gap:8px;margin:4px 10px 0;padding:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-height:40px;font-size:14px;line-height:1.2}
+#modAv{font-size:24px}
+#modText b{font-weight:600}
+
+#table{flex:1;position:relative;margin:8px 10px;border-radius:18px;overflow:hidden;background:#17120e;min-height:250px;touch-action:none}
+#table canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#labels{position:absolute;inset:0;pointer-events:none}
+.seat{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:2px;z-index:5;pointer-events:none}
+.tag{background:var(--hud);color:var(--hudink);border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap;border:2px solid transparent}
+.seat.turn .tag{border-color:var(--mao)}
+.bubble{background:var(--bubble);color:var(--bubbleink);border-radius:12px;padding:5px 9px;font-size:13px;font-weight:500;width:max-content;max-width:170px;text-align:center;opacity:0;transform:scale(.8);transition:opacity .15s,transform .15s;box-shadow:0 3px 8px rgba(0,0,0,.3);margin-bottom:2px}
+.bubble.show{opacity:1;transform:scale(1)}
+.bubble:empty{display:none}
+
+#meta{position:absolute;left:8px;top:8px;display:flex;gap:6px;align-items:center;z-index:6;pointer-events:none}
+.hudpill{background:var(--hud);color:var(--hudink);border-radius:10px;padding:4px 8px;font-size:14px;font-weight:600}
+#topEl.red,#suitEl.red{color:#ff8a80}
+#suitEl:empty,#topEl:empty{display:none}
+#hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);background:var(--hud);color:var(--hudink);border-radius:10px;padding:5px 10px;font-size:13px;z-index:6;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+#hint:empty{display:none}
+#fpv{position:absolute;inset:0;pointer-events:none;z-index:25;display:none;align-items:center;justify-content:center;overflow:hidden}
+#fpv.show{display:flex}
+#fpv .fe{font-size:80px;animation:incoming .75s cubic-bezier(.2,.6,.3,1) forwards}
+@keyframes incoming{0%{transform:scale(.15) translateY(-40px);opacity:.9}70%{transform:scale(2.6);opacity:1}100%{transform:scale(3.2);opacity:0}}
+#fpv .flash{position:absolute;inset:0;background:rgba(255,60,40,.0);animation:flash .6s .5s forwards}
+@keyframes flash{0%{background:rgba(255,60,40,0)}20%{background:rgba(255,60,40,.55)}100%{background:rgba(255,60,40,0)}}
+#table.rumble{animation:rumble .5s .55s}
+@keyframes rumble{10%,50%,90%{transform:translate(-6px,3px)}30%,70%{transform:translate(6px,-3px)}}
+
+.card{width:52px;height:74px;border-radius:8px;background:var(--cardbg);color:var(--cardink);box-shadow:0 2px 5px rgba(0,0,0,.3);display:flex;flex-direction:column;justify-content:space-between;padding:4px 5px;font-weight:700;font-size:14px;line-height:1;flex:0 0 auto;position:relative;border:1px solid #d6ccb8;transition:transform .15s}
+.card .mid{font-size:24px;text-align:center}
+.card .br{align-self:flex-end;transform:rotate(180deg)}
+.card.red{color:var(--cardred)}
+.card.joker .mid{font-size:28px}
+#hand .card{cursor:pointer}
+#hand .card.staged{transform:translateY(-12px);outline:3px solid var(--mao);outline-offset:1px}
+
+#notice{position:absolute;left:50%;top:22%;transform:translate(-50%,-10px);background:var(--pen);color:var(--penink);padding:10px 14px;border-radius:14px;font-weight:700;font-size:17px;text-align:center;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;width:max-content;max-width:88%;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+#notice.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#notice.win{background:var(--mao);color:var(--maoink)}
+#notice small{display:block;font-weight:500;font-size:13px;margin-top:2px}
+#notice button{margin-top:8px;background:var(--penink);color:var(--pen);border:none;border-radius:10px;padding:8px 14px;font-weight:700;font-size:15px}
+
+#trow{display:flex;align-items:center;gap:8px;padding:0 10px;height:42px}
+#status{flex:1;font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#drawBtn{display:none;height:34px;border-radius:10px;border:2px solid var(--line);background:var(--panel);font-weight:600;padding:0 12px;font-size:14px}
+#drawBtn.show{display:block}
+#tbar{flex:1;height:10px;border-radius:6px;background:var(--line);overflow:hidden;display:none}
+#tbar i{display:block;height:100%;width:100%;background:var(--mao)}
+#tctl{display:none;gap:5px;align-items:center}
+#tctl .suit{width:34px;height:34px;border-radius:8px;border:2px solid var(--line);background:var(--cardbg);color:var(--cardink);font-size:18px;padding:0}
+#tctl .suit.red{color:var(--cardred)}
+#tctl .suit.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+#tctl .done{height:34px;border-radius:10px;border:none;background:var(--accent);color:var(--accentink);font-weight:600;padding:0 12px;font-size:14px}
+#app.staging #status,#app.staging #drawBtn{display:none}
+#app.staging #tbar,#app.staging #tctl{display:flex}
+
+#moves{display:flex;flex-wrap:wrap;gap:6px;padding:7px 10px;margin:0 10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;min-height:46px;align-items:center}
+#moves .hint{font-size:13px;color:var(--muted)}
+.chip{font-size:14px;padding:7px 11px;border-radius:999px;border:2px solid var(--line);background:var(--chip);color:var(--chipink);font-weight:600;line-height:1.1}
+.chip.on{background:var(--accent);color:var(--accentink);border-color:var(--accent)}
+#app.staging .chip{border-color:var(--accent)}
+
+#hand{display:flex;gap:6px;overflow-x:auto;padding:16px 10px 6px;min-height:100px;scrollbar-width:thin}
+
+#chatbar{display:none;gap:6px;padding:4px 10px}
+#chatbar.show{display:flex}
+#chatIn{flex:1;min-width:0;font:inherit;font-size:16px;padding:8px 10px;border-radius:10px;border:2px solid var(--line);background:var(--panel);color:var(--ink);-webkit-user-select:text;user-select:text}
+#chatbar button{border:none;border-radius:10px;padding:0 12px;font-weight:600;background:var(--accent);color:var(--accentink)}
+#ptBtn{display:none}
+#chatbar.poo #ptBtn{display:block;background:var(--mao);color:var(--maoink)}
+
+#bottom{display:flex;gap:8px;padding:6px 10px 10px;align-items:stretch}
+#mao{background:var(--mao);color:var(--maoink);font-size:24px;font-weight:700;border-radius:16px;padding:10px 20px;border:3px solid var(--maoink);letter-spacing:.04em;min-width:96px}
+#mao:active{transform:scale(.95)}
+#mao.flash{animation:maoflash .5s}
+@keyframes maoflash{50%{box-shadow:0 0 0 10px rgba(255,210,63,.5)}}
+.small{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:2px solid var(--line);background:var(--panel);border-radius:14px;padding:4px 8px;font-size:20px;min-width:56px}
+.small span{font-size:11px;font-weight:600}
+#pen{margin-left:auto;background:var(--pen);color:var(--penink);border:none;border-radius:16px;font-size:16px;font-weight:700;padding:10px 14px}
+#pen:active{transform:scale(.95)}
+
+.overlay{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
+.panel{background:var(--panel);color:var(--ink);border-radius:20px;padding:18px;width:100%;max-width:420px;max-height:100%;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.panel h1{font-size:64px;margin:0;line-height:1;letter-spacing:.06em;color:var(--ink)}
+.panel h1 span{display:inline-block;background:var(--mao);color:var(--maoink);border-radius:14px;padding:4px 14px;transform:rotate(-4deg)}
+.panel h2{margin:0 0 4px;font-size:22px}
+.panel .sub{margin:0 0 12px;color:var(--muted);font-size:15px;line-height:1.35}
+.panel ul{padding-left:18px;margin:8px 0 14px;line-height:1.45;font-size:15px}
+.btn{width:100%;border:none;border-radius:14px;padding:13px;font-size:17px;font-weight:600;background:var(--accent);color:var(--accentink)}
+.btn.ghost{background:transparent;border:2px solid var(--line);color:var(--ink)}
+.btn:disabled{opacity:.45}
+.row{display:flex;gap:8px;margin-top:12px}
+
+.drow{display:flex;align-items:center;gap:10px;margin:8px 0}
+.drow>span{width:46px;font-weight:600;font-size:14px;color:var(--muted)}
+.sw{display:flex;gap:6px;flex-wrap:wrap}
+.swb{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);padding:0;font-size:18px;background:var(--chip)}
+.swb.on{border-color:var(--mao);box-shadow:0 0 0 2px var(--mao)}
+.rollwrap{display:flex;gap:6px;margin:6px 0 10px}
+.rcol{flex:1;min-width:0}
+.rt{text-align:center;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.rbox{position:relative}
+.roller{height:132px;overflow-y:auto;scroll-snap-type:y mandatory;border-radius:12px;background:var(--bg);scrollbar-width:none;overscroll-behavior:contain}
+.roller::-webkit-scrollbar{display:none}
+.ri{height:44px;display:grid;place-items:center;scroll-snap-align:center;font-weight:600;font-size:14px;text-align:center;padding:0 3px;line-height:1.05}
+.pad{height:44px}
+.band{position:absolute;left:0;right:0;top:44px;height:44px;border:3px solid var(--mao);border-radius:10px;pointer-events:none;z-index:2}
+.preview{font-size:17px;font-weight:600;text-align:center;min-height:44px;padding:8px;border-radius:12px;background:var(--bg)}
+.warn{color:var(--pen);font-size:14px;text-align:center;min-height:18px;margin-top:6px}
+
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr"><div id="scores"></div><button id="helpBtn" aria-label="How to play">?</button></header>
+  <div id="mod"><span id="modAv">🎩</span><span id="modText">The Moderator is watching.</span></div>
+  <div id="table">
+    <div id="labels">
+      <div class="seat" id="s0"><div class="bubble"></div><div class="tag"></div></div>
+      <div class="seat" id="s1"><div class="bubble"></div><div class="tag"></div></div>
+      <div class="seat" id="s2"><div class="bubble"></div><div class="tag"></div></div>
+      <div class="seat" id="s3"><div class="bubble"></div><div class="tag"></div></div>
+    </div>
+    <div id="meta"><div class="hudpill" id="deckN"></div><div class="hudpill" id="topEl"></div><div class="hudpill" id="suitEl"></div><div class="hudpill" id="dirEl"></div></div>
+    <div id="hint"></div>
+    <div id="fpv"></div>
+    <div id="notice"></div>
+  </div>
+  <div id="trow"><div id="status"></div><button id="drawBtn">🂠 Draw a card</button><div id="tbar"><i></i></div><div id="tctl"></div></div>
+  <div id="moves"></div>
+  <div id="hand"></div>
+  <div id="chatbar"><input id="chatIn" placeholder="Say something…" autocomplete="off" maxlength="80"><button id="chatSend">Say</button><button id="ptBtn">Point taken</button></div>
+  <div id="bottom">
+    <button id="mao">MAO</button>
+    <button id="poo" class="small">✋<span>Point of order</span></button>
+    <button id="chatBtn" class="small">💬<span>Talk</span></button>
+    <button id="pen">PENALIZE</button>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const raw=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const rint=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rint(a.length)];
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rint(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const lowerFirst=s=>s.charAt(0).toLowerCase()+s.slice(1);
+
+const SUITS=['♠','♥','♦','♣'];
+const SUITNAME={'♠':'spades','♥':'hearts','♦':'diamonds','♣':'clubs'};
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const RANKNAME={A:'Ace',J:'Jack',Q:'Queen',K:'King',JK:'Joker'};
+const rankName=r=>RANKNAME[r]||r;
+const isRed=s=>s==='♥'||s==='♦';
+const cardName=c=>c.rank==='JK'?'Joker':`${rankName(c.rank)} of ${SUITNAME[c.suit]}`;
+const cardShort=c=>c.rank==='JK'?'🃏':c.rank+c.suit;
+const isWild=c=>c.rank==='J'||c.rank==='JK';
+const nicePhrase=n=>'Have a '+'very '.repeat(n)+'nice day';
+
+const ITEMS=[
+  {e:'🍅',n:'Bag of tomatoes',v:'Pelted'},
+  {e:'🥧',n:'Cream pie',v:'Pied'},
+  {e:'🐔',n:'Rubber chicken',v:'Bonked'},
+  {e:'🍜',n:'Wet noodles',v:'Slapped'},
+  {e:'🖐️',n:'Foam hand',v:'Smacked'},
+  {e:'🔨',n:'Squeaky mallet',v:'Whacked'},
+  {e:'🎈',n:'Water balloon',v:'Splashed'},
+  {e:'🪶',n:'Tickle feather',v:'Tickled'},
+  {e:'🎉',n:'Confetti cannon',v:'Blasted'},
+  {e:'🍌',n:'Banana',v:'Slipped'},
+  {e:'🧦',n:'Smelly sock',v:'Swatted'},
+  {e:'🐟',n:'Wet fish',v:'Slapped'}
+];
+const MOD_ITEM={e:'🥊',n:'Big glove',v:'Bopped'};
+
+const ACTIONS={
+  Say:{icon:'🗣',speech:true,details:['Bananas!','Ooga booga','Cheese!','Yeehaw!','Bless you','Oh no'],label:d=>`Say "${d}"`},
+  Sing:{icon:'🎵',speech:true,details:['La la la','Do re mi','Happy birthday','One high note','Fa la la'],label:d=>`Sing "${d}"`},
+  Jump:{icon:'🦘',details:['once','twice','three times'],label:d=>`Jump ${d}`},
+  Touch:{icon:'👆',details:['your nose','your head','the table','your ears','the player on your left'],label:d=>`Touch ${d}`},
+  Clap:{icon:'👏',details:['once','twice','three times'],label:d=>`Clap ${d}`},
+  Wave:{icon:'👋',details:['at everyone','at the Moderator','at the player across'],label:d=>`Wave ${d}`},
+  Spin:{icon:'🌀',details:['around once','around twice'],label:d=>`Spin ${d}`}
+};
+
+const players=[
+  {name:'You',emoji:'🧑',bot:false,color:0x2a63c9},
+  {name:'Pip',emoji:'🐸',bot:true,color:0x3aa655},
+  {name:'Juno',emoji:'🦊',bot:true,color:0xe07b2a},
+  {name:'Tank',emoji:'🐻',bot:true,color:0x8b5a2b}
+].map(p=>({...p,hand:[],item:null,score:0}));
+
+const S={deck:[],pile:[],turn:0,dir:1,skip:false,chain:0,calledSuit:null,
+  discovered:new Set(),rules:[],ruleSeq:0,round:0,roundOver:true,started:false,
+  staged:null,openViolation:null,mao:null,paused:false,poo:false,pooId:0,
+  humanResolve:null,penaltyChain:Promise.resolve(),dealer:3,lastWinner:null,
+  ignoreMao:false,falseQueued:false,turnIv:null,turnLeft:0,stageTimer:null};
+
+/* ---------- sound ---------- */
+let AC=null;
+function sfx(t){
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+    const now=AC.currentTime;
+    const set={bling:[880,1760,'triangle',.22],hit:[220,70,'square',.2],mao:[523,1046,'sawtooth',.25],pen:[330,180,'square',.12],grab:[600,950,'sine',.15],bad:[200,120,'sawtooth',.3],whoosh:[300,900,'sine',.35],card:[700,500,'triangle',.08]}[t]||[440,440,'sine',.1];
+    o.type=set[2];o.frequency.setValueAtTime(set[0],now);o.frequency.exponentialRampToValueAtTime(set[1],now+set[3]);
+    g.gain.setValueAtTime(.12,now);g.gain.exponentialRampToValueAtTime(.001,now+set[3]+.05);
+    o.start(now);o.stop(now+set[3]+.06);
+  }catch(e){}
+}
+
+/* ---------- helpers ---------- */
+async function wait(ms){let t=0;while(t<ms){await raw(50);if(!S.paused)t+=50;}}
+async function waitUnpaused(){while(S.paused)await raw(100);}
+function queuePenalty(fn){S.penaltyChain=S.penaltyChain.then(fn).catch(e=>console.error(e));return S.penaltyChain;}
+const ruleById=id=>S.rules.find(r=>r.id===Number(id));
+function mod(t){$('#modText').innerHTML=t;}
+function hint(t){$('#hint').textContent=t||'';}
+function bubble(i,text,ms=2300){
+  if(!text)return;
+  const b=document.querySelector(`#s${i} .bubble`);b.textContent=text;b.classList.add('show');
+  clearTimeout(b._t);b._t=setTimeout(()=>{b.classList.remove('show');setTimeout(()=>{if(!b.classList.contains('show'))b.textContent='';},200);},ms);
+}
+function overlay(html){const d=document.createElement('div');d.className='overlay';d.innerHTML=html;$('#app').appendChild(d);return d;}
+function notice(html,cls='',ms=1800){
+  const n=$('#notice');n.className=cls;n.innerHTML=html;void n.offsetWidth;n.classList.add('show');
+  clearTimeout(n._t);if(ms)n._t=setTimeout(()=>n.classList.remove('show'),ms);
+}
+
+/* ---------- 3D scene ---------- */
+const V3=(x,y,z)=>new THREE.Vector3(x,y,z);
+const SEAT_POS=[V3(0,0,3.1),V3(-3.1,0,0),V3(0,0,-3.1),V3(3.1,0,0)];
+const PT=V3(-6.3,0,-3.4);
+const MODPOS=V3(2.9,0,-2.9);
+const TABLE_Y=0.93;
+let scene,camera,renderer,clock,floorMesh,deckMesh,pileMeshes=[],itemSprites=[],tweens=[];
+const ray=new THREE.Raycaster();
+const avatars=[];
+let camYaw=0,phase='idle',threeOK=false;
+
+function emojiTex(e,size=128,bg=null){
+  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
+  if(bg){x.fillStyle=bg;x.beginPath();x.arc(size/2,size/2,size/2-2,0,Math.PI*2);x.fill();}
+  x.font=`${size*.68}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;x.textAlign='center';x.textBaseline='middle';x.fillText(e,size/2,size/2+size*.04);
+  return new THREE.CanvasTexture(c);
+}
+function sprite(e,scale,bg){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:emojiTex(e,128,bg),transparent:true}));s.scale.set(scale,scale,1);return s;}
+function cardTex(c){
+  const w=128,h=180,cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');
+  x.fillStyle='#fffdf6';x.fillRect(0,0,w,h);x.strokeStyle='#d6ccb8';x.lineWidth=4;x.strokeRect(2,2,w-4,h-4);
+  x.fillStyle=c.rank==='JK'?'#1b1a17':(isRed(c.suit)?'#c62f28':'#1b1a17');
+  x.textAlign='center';x.textBaseline='middle';
+  if(c.rank==='JK'){x.font='bold 30px sans-serif';x.fillText('JOKER',w/2,h/2);}
+  else{x.font='bold 54px sans-serif';x.fillText(c.rank,w/2,h/2-30);x.font='70px serif';x.fillText(c.suit,w/2,h/2+42);}
+  return new THREE.CanvasTexture(cv);
+}
+const SKINS=[0xf6d3b5,0xe0b08a,0xc68a5b,0x9c6238,0x6a4027];
+const HAIRS=[0x2a1b12,0x6b3e1e,0xd9a441,0xc9442c,0x1b1a17,0x8a8a8a,0xd63ea0,0x2f6fd6];
+const SHIRTS=[0x2a63c9,0x3aa655,0xe07b2a,0xc62f28,0x7b3fbf,0xe6b422,0x1b1a17,0xf2f2f2];
+const HATS=['none','cap','crown','bow','beanie'];
+function makeAvatar(design){
+  const g=new THREE.Group();
+  const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:.85});
+  const parts={};
+  const legs=new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.5,16),mat(0x2b2b3a));legs.position.y=.25;legs.castShadow=true;g.add(legs);
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.27,.3,.65,20),mat(design.shirt));body.position.y=.82;body.castShadow=true;g.add(body);parts.body=body;
+  const neck=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.12,10),mat(design.skin));neck.position.y=1.2;g.add(neck);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.26,24,18),mat(design.skin));head.position.y=1.5;head.castShadow=true;g.add(head);parts.head=head;
+  const hair=new THREE.Mesh(new THREE.SphereGeometry(.275,24,18,0,Math.PI*2,0,Math.PI*.55),mat(design.hair));hair.position.y=1.52;g.add(hair);parts.hair=hair;
+  const em=mat(0x111111);[-.09,.09].forEach(x=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.035,10,8),em);e.position.set(x,1.54,.235);g.add(e);});
+  const mouth=new THREE.Mesh(new THREE.BoxGeometry(.1,.02,.02),em);mouth.position.set(0,1.41,.25);g.add(mouth);
+  const hat=new THREE.Group();hat.position.y=1.5;g.add(hat);parts.hat=hat;
+  const arm=(side)=>{const a=new THREE.Group();a.position.set(side*.33,1.1,0);const up=new THREE.Mesh(new THREE.CylinderGeometry(.065,.06,.62,12),mat(design.shirt));up.position.y=-.31;up.castShadow=true;a.add(up);const hand=new THREE.Mesh(new THREE.SphereGeometry(.075,12,10),mat(design.skin));hand.position.y=-.64;a.add(hand);g.add(a);return a;};
+  parts.armL=arm(-1);parts.armR=arm(1);
+  const held=new THREE.Group();held.position.set(0,-.72,.05);parts.armR.add(held);
+  g.userData={held,parts,target:null,speed:3,bob:0,facing:0,onArrive:null,design};
+  applyHat(g,design.hat);
+  scene.add(g);return g;
+}
+function applyHat(g,type){
+  const hat=g.userData.parts.hat;while(hat.children.length)hat.remove(hat.children[0]);
+  const mat=c=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
+  if(type==='cap'){const c=new THREE.Mesh(new THREE.SphereGeometry(.29,20,14,0,Math.PI*2,0,Math.PI*.45),mat(0xc62f28));c.position.y=.05;hat.add(c);const b=new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.22),mat(0xc62f28));b.position.set(0,.09,.3);hat.add(b);}
+  else if(type==='crown'){const c=new THREE.Mesh(new THREE.CylinderGeometry(.22,.19,.18,8,1,true),mat(0xe6b422));c.position.y=.3;c.material.side=THREE.DoubleSide;hat.add(c);}
+  else if(type==='bow'){const b=new THREE.Mesh(new THREE.SphereGeometry(.09,12,10),mat(0xff6fb1));b.position.set(.2,.2,0);hat.add(b);}
+  else if(type==='beanie'){const c=new THREE.Mesh(new THREE.SphereGeometry(.3,20,14,0,Math.PI*2,0,Math.PI*.5),mat(0x2f6fd6));c.position.y=.03;hat.add(c);const p=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),mat(0xf2f2f2));p.position.y=.36;hat.add(p);}
+}
+function applyDesign(g,d){
+  const p=g.userData.parts;p.body.material.color.setHex(d.shirt);p.armL.children[0].material.color.setHex(d.shirt);p.armR.children[0].material.color.setHex(d.shirt);
+  p.head.material.color.setHex(d.skin);p.armL.children[1].material.color.setHex(d.skin);p.armR.children[1].material.color.setHex(d.skin);
+  p.hair.material.color.setHex(d.hair);applyHat(g,d.hat);g.userData.design=d;
+}
+function randomDesign(shirt){return{skin:pick(SKINS),hair:pick(HAIRS),shirt:shirt!=null?shirt:pick(SHIRTS),hat:pick(HATS)};}
+function setHeld(av,item){const h=av.userData.held;while(h.children.length)h.remove(h.children[0]);if(item){const s=sprite(item.e,.55);h.add(s);}}
+function walkTo(av,pos){return new Promise(res=>{const u=av.userData;u.target=pos.clone().setY(0);u.onArrive=res;});}
+function faceTable(av){av.userData.facing=Math.atan2(-av.position.x,-av.position.z);}
+function tween(dur,fn){return new Promise(res=>tweens.push({t:0,dur,fn,res}));}
+const ease=k=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+
+function init3D(){
+  if(!window.THREE)return false;
+  const box=$('#table');
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x1d1611);scene.fog=new THREE.Fog(0x1d1611,14,26);
+  camera=new THREE.PerspectiveCamera(55,1,.1,60);
+  renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(2,window.devicePixelRatio));renderer.shadowMap.enabled=true;
+  box.insertBefore(renderer.domElement,box.firstChild);
+  scene.add(new THREE.HemisphereLight(0xfff2dc,0x2a1a10,.75));
+  const sun=new THREE.DirectionalLight(0xffe9c7,.9);sun.position.set(4,9,5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+  sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=12;sun.shadow.camera.bottom=-12;scene.add(sun);
+  const spot=new THREE.PointLight(0xffd9a0,.6,12);spot.position.set(0,4.5,0);scene.add(spot);
+  floorMesh=new THREE.Mesh(new THREE.PlaneGeometry(26,26),new THREE.MeshStandardMaterial({color:0x5a3a24,roughness:.95}));floorMesh.rotation.x=-Math.PI/2;floorMesh.receiveShadow=true;scene.add(floorMesh);
+  const rug=new THREE.Mesh(new THREE.CircleGeometry(5.2,48),new THREE.MeshStandardMaterial({color:0x7a1f2a,roughness:1}));rug.rotation.x=-Math.PI/2;rug.position.y=.01;rug.receiveShadow=true;scene.add(rug);
+  const wallMat=new THREE.MeshStandardMaterial({color:0x3c2a22,roughness:1});
+  [[0,-13,0],[0,13,Math.PI],[-13,0,Math.PI/2],[13,0,-Math.PI/2]].forEach(([x,z,r])=>{const w=new THREE.Mesh(new THREE.PlaneGeometry(26,5),wallMat);w.position.set(x,2.5,z);w.rotation.y=r;scene.add(w);});
+  const top=new THREE.Mesh(new THREE.CylinderGeometry(2.3,2.3,.18,48),new THREE.MeshStandardMaterial({color:0x1f6b4c,roughness:.9}));top.position.y=TABLE_Y-.09;top.castShadow=true;top.receiveShadow=true;scene.add(top);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(2.3,.1,12,48),new THREE.MeshStandardMaterial({color:0x4a2a18,roughness:.7}));rim.rotation.x=Math.PI/2;rim.position.y=TABLE_Y;scene.add(rim);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.35,.6,TABLE_Y-.18,16),new THREE.MeshStandardMaterial({color:0x3a2010}));leg.position.y=(TABLE_Y-.18)/2;leg.castShadow=true;scene.add(leg);
+  SEAT_POS.forEach(p=>{const st=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,.45,16),new THREE.MeshStandardMaterial({color:0x6b3b1e}));st.position.copy(p).setY(.225);st.position.multiplyScalar(1.2);st.position.y=.225;st.castShadow=true;scene.add(st);});
+  const pt=new THREE.Mesh(new THREE.BoxGeometry(3.8,.9,1.3),new THREE.MeshStandardMaterial({color:0x8a5a33,roughness:.9}));pt.position.copy(PT).setY(.45);pt.castShadow=true;pt.receiveShadow=true;scene.add(pt);
+  const cloth=new THREE.Mesh(new THREE.BoxGeometry(3.9,.06,1.4),new THREE.MeshStandardMaterial({color:0xb12a3a}));cloth.position.copy(PT).setY(.93);scene.add(cloth);
+  const sign=sprite('⚡',.7);sign.position.copy(PT).setY(2.1);scene.add(sign);
+  deckMesh=new THREE.Mesh(new THREE.BoxGeometry(.85,.16,1.19),new THREE.MeshStandardMaterial({color:0x8a2f2f}));deckMesh.position.set(-1.0,TABLE_Y+.08,0);deckMesh.castShadow=true;scene.add(deckMesh);
+  players.forEach((p,i)=>{const a=makeAvatar(i===0?{skin:SKINS[1],hair:HAIRS[0],shirt:SHIRTS[0],hat:'none'}:randomDesign(p.color));a.position.copy(SEAT_POS[i]);faceTable(a);avatars.push(a);});
+  const m=makeAvatar({skin:SKINS[2],hair:HAIRS[4],shirt:0x1b1a17,hat:'crown'});m.position.copy(MODPOS);faceTable(m);avatars.push(m);
+  const ro=new ResizeObserver(resize);ro.observe(box);resize();
+  clock=new THREE.Clock();
+  const el=renderer.domElement;let down=null,drag=false;
+  el.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};drag=false;el.setPointerCapture(e.pointerId);});
+  el.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-down.x,dy=e.clientY-down.y;if(Math.abs(dx)+Math.abs(dy)>8)drag=true;if(drag){camYaw-=e.movementX*.0075;}});
+  el.addEventListener('pointerup',e=>{if(down&&!drag)tap3D(e.clientX,e.clientY);down=null;});
+  el.addEventListener('pointercancel',()=>{down=null;});
+  threeOK=true;loop();return true;
+}
+function resize(){const b=$('#table');const w=b.clientWidth,h=b.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function tap3D(x,y){
+  const r=renderer.domElement.getBoundingClientRect();
+  const m=new THREE.Vector2(((x-r.left)/r.width)*2-1,-((y-r.top)/r.height)*2+1);ray.setFromCamera(m,camera);
+  if(phase==='rush'){
+    const hs=ray.intersectObjects(itemSprites.filter(s=>s.visible));
+    if(hs.length){tapItem(hs[0].object.userData.j);return;}
+    const hf=ray.intersectObject(floorMesh);
+    if(hf.length){const p=hf[0].point.clone();p.x=Math.max(-11,Math.min(11,p.x));p.z=Math.max(-11,Math.min(11,p.z));p.y=0;if(p.length()<2.9)p.setLength(2.9);walkTo(avatars[0],p);}
+    return;
+  }
+  if(phase==='seated'){const hd=ray.intersectObject(deckMesh);if(hd.length){tapDeck();return;}}
+}
+function stepAvatars(dt){
+  for(const a of avatars){
+    const u=a.userData;
+    if(u.target){
+      const d=u.target.clone().sub(a.position);d.y=0;const L=d.length();
+      if(L<.06){a.position.copy(u.target);u.target=null;a.position.y=0;u.bob=0;if(u.onArrive){const f=u.onArrive;u.onArrive=null;f();}}
+      else{const st=Math.min(L,u.speed*dt);a.position.add(d.normalize().multiplyScalar(st));u.facing=Math.atan2(d.x,d.z);u.bob+=dt*13;a.position.y=Math.abs(Math.sin(u.bob))*.09;}
+      if(!u.throwing){u.parts.armL.rotation.x=Math.sin(u.bob)*.7;u.parts.armR.rotation.x=-Math.sin(u.bob)*.7;}
+    }else if(!u.throwing){u.parts.armL.rotation.x*=.85;u.parts.armR.rotation.x*=.85;}
+    a.rotation.y=u.facing;
+  }
+}
+let camLook=new THREE.Vector3(0,.9,0),camOverride=null;
+function updateCamera(){
+  const me=avatars[0];let pos,look;
+  if(camOverride){camera.position.lerp(camOverride.pos,.3);camLook.lerp(camOverride.look,.3);camera.lookAt(camLook);return;}
+  if(phase==='design'){pos=me.position.clone().add(V3(Math.sin(me.userData.facing)*2.3,1.6,Math.cos(me.userData.facing)*2.3));look=me.position.clone().add(V3(0,1.1,0));}
+  else if(phase==='rush'){pos=me.position.clone().add(V3(Math.sin(camYaw)*3.2,5.4,Math.cos(camYaw)*3.2));look=me.position.clone().add(V3(-Math.sin(camYaw)*1.2,.6,-Math.cos(camYaw)*1.2));}
+  else{pos=V3(Math.sin(camYaw)*4.6,6.6,Math.cos(camYaw)*4.6);look=V3(0,.9,0);}
+  camera.position.lerp(pos,.1);camLook.lerp(look,.12);camera.lookAt(camLook);
+}
+function updateLabels(){
+  const w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;
+  players.forEach((p,i)=>{
+    const el=$('#s'+i);const v=avatars[i].position.clone().add(V3(0,2.05,0)).project(camera);
+    const vis=v.z<1&&v.x>-1.3&&v.x<1.3&&v.y>-1.3&&v.y<1.3;el.style.display=vis?'':'none';
+    el.style.left=((v.x+1)/2*w)+'px';el.style.top=((1-v.y)/2*h)+'px';
+  });
+}
+function loop(){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.05,clock.getDelta());
+  stepAvatars(dt);
+  for(let i=tweens.length-1;i>=0;i--){const t=tweens[i];t.t+=dt*1000;const k=Math.min(1,t.t/t.dur);t.fn(k);if(k>=1){tweens.splice(i,1);t.res();}}
+  itemSprites.forEach((s,j)=>{if(s.visible)s.position.y=1.28+Math.sin(clock.elapsedTime*2+j)*.06;});
+  updateCamera();renderer.render(scene,camera);updateLabels();
+}
+async function animCard(i,card){
+  if(!threeOK)return;
+  const from=i<0?deckMesh.position.clone():avatars[i].position.clone().add(V3(0,1.3,0));
+  const n=pileMeshes.length;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(.85,1.19),new THREE.MeshBasicMaterial({map:cardTex(card),side:THREE.DoubleSide}));
+  m.position.copy(from);scene.add(m);pileMeshes.push(m);
+  const to=V3(.25+rnd(-.05,.05),TABLE_Y+.012+n*.004,rnd(-.05,.05));const rz=rnd(-.25,.25);
+  sfx('card');
+  await tween(450,k=>{const e=ease(k);m.position.lerpVectors(from,to,e);m.position.y+=Math.sin(k*Math.PI)*.8;m.rotation.set(-Math.PI/2*e,0,rz*e);});
+  m.position.copy(to);
+  while(pileMeshes.length>10){const old=pileMeshes.shift();scene.remove(old);}
+}
+function animDraw(i){
+  if(!threeOK)return;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(.85,1.19),new THREE.MeshBasicMaterial({color:0x8a2f2f,side:THREE.DoubleSide}));
+  const from=deckMesh.position.clone(),to=avatars[i].position.clone().add(V3(0,1.3,0));m.position.copy(from);m.rotation.x=-Math.PI/2;scene.add(m);
+  tween(400,k=>{m.position.lerpVectors(from,to,ease(k));m.position.y+=Math.sin(k*Math.PI)*.5;}).then(()=>scene.remove(m));
+}
+function clearPile(){pileMeshes.forEach(m=>scene.remove(m));pileMeshes=[];}
+function splash(){
+  sfx('bling');if(!threeOK)return;
+  const r=new THREE.Mesh(new THREE.RingGeometry(.3,.42,40),new THREE.MeshBasicMaterial({color:0x3ee07a,transparent:true,side:THREE.DoubleSide}));
+  r.rotation.x=-Math.PI/2;r.position.set(.25,TABLE_Y+.08,0);scene.add(r);
+  tween(600,k=>{r.scale.setScalar(1+k*4);r.material.opacity=1-k;}).then(()=>scene.remove(r));
+}
+
+/* ---------- deck ---------- */
+function makeDeck(){let id=0;const d=[];for(const s of SUITS)for(const r of RANKS)d.push({id:id++,rank:r,suit:s});d.push({id:id++,rank:'JK',suit:null});return d;}
+function drawOne(){
+  if(!S.deck.length){if(S.pile.length<2)return null;const top=S.pile.pop();S.deck=shuffle(S.pile);S.pile=[top];}
+  return S.deck.pop();
+}
+function drawCards(i,n){for(let k=0;k<n;k++){const c=drawOne();if(c){players[i].hand.push(c);setTimeout(()=>animDraw(i),k*120);}}render();}
+function topCard(){return S.pile[S.pile.length-1];}
+function isLegal(card){
+  const top=topCard();
+  if(S.chain>0)return card.rank==='7';
+  if(isWild(card))return true;
+  const suit=S.calledSuit||top.suit;
+  return card.suit===suit||card.rank===top.rank;
+}
+function bestSuit(i){
+  const c={};players[i].hand.forEach(x=>{if(!isWild(x))c[x.suit]=(c[x.suit]||0)+1;});
+  let best=pick(SUITS),n=0;for(const s in c)if(c[s]>n){n=c[s];best=s;}return best;
+}
+
+/* ---------- rules ---------- */
+function customFor(card){return S.rules.filter(r=>r.rank===card.rank&&(r.suit==='any'||r.suit===card.suit));}
+function required(card,very){
+  const req=[];
+  if(card.suit==='♠')req.push({k:'name',rule:'spade',reason:'Failure to name the card'});
+  if(card.rank==='7')req.push({k:'nice',very,rule:'seven',reason:`Failure to say "${nicePhrase(very)}"`});
+  customFor(card).forEach(r=>req.push({k:'c:'+r.id,rule:'c:'+r.id,reason:'Failure to '+lowerFirst(r.label)}));
+  return req;
+}
+function isSpeech(k){if(k==='name'||k==='nice'||k==='very')return true;if(k.startsWith('c:')){const r=ruleById(k.slice(2));return r?r.speech:false;}return false;}
+function judge(req,said,very){
+  const v=[];
+  for(const r of req){
+    if(r.k==='nice'){if(!said.has('nice')||very!==r.very)v.push(r);}
+    else if(!said.has(r.k))v.push(r);
+  }
+  const keys=new Set(req.map(r=>r.k));let talked=false;
+  for(const k of said){
+    if(keys.has(k))continue;
+    if(isSpeech(k))talked=true;
+    else{const lab=k==='knock'?'knocking':(ruleById(k.slice(2))||{label:'that'}).label.toLowerCase();v.push({reason:'Unnecessary '+lab,rule:null});}
+  }
+  if(talked)v.push({reason:'Talking',rule:'talk'});
+  return v;
+}
+function moveText(k,card,very){
+  if(k==='name')return card?cardName(card)+'.':'…the card?';
+  if(k==='nice')return nicePhrase(very)+'!';
+  if(k==='knock')return '✊ knock knock';
+  if(k.startsWith('c:')){const r=ruleById(k.slice(2));if(r)return r.speech?`${r.icon} ${r.detail}`:`${r.icon} *${r.label.toLowerCase()}*`;}
+  return '';
+}
+function conflicts(rank,suit){return S.rules.some(r=>r.rank===rank&&(r.suit==='any'||suit==='any'||r.suit===suit));}
+function triggerName(rank,suit){if(rank==='JK')return 'the Joker';return suit==='any'?`any ${rankName(rank)}`:`the ${rankName(rank)} of ${SUITNAME[suit]}`;}
+function makeRule(c,by){const a=ACTIONS[c.action];return{id:++S.ruleSeq,rank:c.rank,suit:c.suit,action:c.action,detail:c.detail,label:a.label(c.detail),icon:a.icon,speech:!!a.speech,by};}
+function makeBotRule(by){
+  for(let t=0;t<80;t++){
+    const rank=pick([...RANKS,'JK']);const suit=rank==='JK'||Math.random()<.4?'any':pick(SUITS);
+    if(conflicts(rank,suit))continue;
+    const action=pick(Object.keys(ACTIONS));const detail=pick(ACTIONS[action].details);
+    return makeRule({rank,suit,action,detail},by);
+  }
+  return null;
+}
+
+/* ---------- rendering (2D HUD) ---------- */
+function cardEl(c){
+  const d=document.createElement('div');
+  if(c.rank==='JK'){d.className='card joker';d.innerHTML='<span>JK</span><span class="mid">🃏</span><span class="br">JK</span>';return d;}
+  d.className='card'+(isRed(c.suit)?' red':'');
+  d.innerHTML=`<span>${c.rank}${c.suit}</span><span class="mid">${c.suit}</span><span class="br">${c.rank}${c.suit}</span>`;
+  return d;
+}
+function renderSeats(){
+  players.forEach((p,i)=>{
+    const s=$('#s'+i);
+    s.querySelector('.tag').textContent=`${p.name}${S.started?' · 🂠'+p.hand.length:''}${p.item?' · '+p.item.e:''}`;
+    s.classList.toggle('turn',S.started&&!S.roundOver&&S.turn===i);
+    if(threeOK)setHeld(avatars[i],p.item);
+  });
+  if(threeOK)setHeld(avatars[4],MOD_ITEM);
+}
+function renderCenter(){
+  $('#deckN').textContent=`🂠 ${S.deck.length}`;
+  const t=topCard();const te=$('#topEl');te.textContent=t?cardShort(t):'';te.className='hudpill'+(t&&isRed(t.suit)?' red':'');
+  $('#dirEl').textContent=S.started?(S.dir===1?'↻':'↺'):'';
+  const se=$('#suitEl');se.textContent=S.calledSuit?'→ '+S.calledSuit:'';se.className='hudpill'+(S.calledSuit&&isRed(S.calledSuit)?' red':'');
+}
+const SUIT_ORDER={'♠':0,'♥':1,'♣':2,'♦':3};
+function renderHand(){
+  const h=$('#hand');h.innerHTML='';
+  const cards=[...players[0].hand].sort((a,b)=>{
+    if(a.rank==='JK')return 1;if(b.rank==='JK')return -1;
+    return SUIT_ORDER[a.suit]-SUIT_ORDER[b.suit]||RANKS.indexOf(a.rank)-RANKS.indexOf(b.rank);
+  });
+  cards.forEach(c=>{
+    const el=cardEl(c);el.setAttribute('role','button');el.setAttribute('aria-label',cardName(c));
+    if(S.staged&&S.staged.card&&S.staged.card.id===c.id)el.classList.add('staged');
+    el.onclick=()=>tapCard(c);h.appendChild(el);
+  });
+}
+function renderMoves(){
+  const box=$('#moves');box.innerHTML='';
+  const st=S.staged;const list=[];
+  if(S.discovered.has('spade'))list.push({k:'name',label:'🗣 Name the card'});
+  if(S.discovered.has('seven')){list.push({k:'nice',label:'🗣 '+nicePhrase(st?st.very:0)});list.push({k:'very',label:'+ very'});}
+  if(S.discovered.has('knock'))list.push({k:'knock',label:'✊ Knock'});
+  S.rules.forEach(r=>{if(S.discovered.has('c:'+r.id))list.push({k:'c:'+r.id,label:`${r.icon} ${r.label}`});});
+  if(!list.length){box.innerHTML='<span class="hint">Your moves show up here once you learn them. Good luck.</span>';return;}
+  list.forEach(it=>{
+    const b=document.createElement('button');
+    b.className='chip'+(st&&it.k!=='very'&&st.said.has(it.k)?' on':'')+(st&&it.k==='very'&&st.very>0?' on':'');
+    b.textContent=it.label;b.onclick=()=>tapMove(it.k);box.appendChild(b);
+  });
+}
+function renderScores(){
+  $('#scores').innerHTML=players.map(p=>`<span>${p.emoji} ${p.score}</span>`).join('')+(S.round?`<span class="rd">Round ${S.round}</span>`:'');
+}
+function renderStatus(){
+  let t='';
+  if(!S.started)t='';
+  else if(S.roundOver)t='Between rounds…';
+  else if(S.poo)t='✋ Point of order. Talking allowed, hands off cards.';
+  else if(S.turn===0)t='Your turn. Tap a card to play it.';
+  else t=`${players[S.turn].name} is thinking…`;
+  $('#status').textContent=t;
+  $('#drawBtn').classList.toggle('show',S.started&&!S.roundOver&&S.turn===0&&!!S.humanResolve&&!S.staged&&!S.poo);
+  $('#app').classList.toggle('staging',!!S.staged);
+  const ctl=$('#tctl');ctl.innerHTML='';
+  if(S.staged){
+    if(S.staged.mode==='play'&&isWild(S.staged.card)){
+      SUITS.forEach(s=>{const b=document.createElement('button');b.className='suit'+(isRed(s)?' red':'')+(S.staged.suit===s?' on':'');b.textContent=s;b.setAttribute('aria-label','Call '+SUITNAME[s]);b.onclick=()=>{S.staged.suit=s;renderStatus();};ctl.appendChild(b);});
+    }
+    const d=document.createElement('button');d.className='done';d.textContent=S.staged.mode==='draw'?'Done':'Play';d.onclick=endStage;ctl.appendChild(d);
+  }
+  $('#chatbar').classList.toggle('poo',S.poo);
+}
+function render(){renderSeats();renderCenter();renderHand();renderMoves();renderScores();renderStatus();}
+
+/* ---------- the throw ---------- */
+async function hit(catcher,target){
+  const item=catcher==='mod'?MOD_ITEM:(players[catcher].item||MOD_ITEM);
+  const by=catcher==='mod'?'the Moderator':players[catcher].name;
+  if(!threeOK){sfx('hit');bubble(target,`💥 ${item.v} by ${by}!`,1800);await raw(700);return;}
+  const from=avatars[catcher==='mod'?4:catcher],to=avatars[target];
+  const u=from.userData;u.facing=Math.atan2(to.position.x-from.position.x,to.position.z-from.position.z);u.throwing=true;
+  const fpv=catcher===0||target===0;
+  if(fpv){
+    const viewer=catcher===0?from:to,other=catcher===0?to:from;
+    if(target===0)to.userData.facing=Math.atan2(from.position.x-to.position.x,from.position.z-to.position.z);
+    camOverride={pos:viewer.position.clone().add(V3(0,1.55,0)),look:other.position.clone().add(V3(0,1.45,0))};
+    avatars[0].visible=false;
+    hint(catcher===0?`You launch the ${item.n.toLowerCase()}!`:`${by} is throwing the ${item.n.toLowerCase()} at you!`);
+    await raw(420);
+  }
+  const arm=u.parts.armR;
+  await tween(320,k=>{arm.rotation.x=-Math.PI*.9*ease(k);});
+  await raw(120);
+  tween(180,k=>{arm.rotation.x=-Math.PI*.9+Math.PI*1.1*ease(k);}).then(()=>tween(300,k=>{arm.rotation.x=Math.PI*.2*(1-k);u.throwing=false;}));
+  await raw(90);
+  const s=sprite(item.e,.6);scene.add(s);
+  const p0=new THREE.Vector3();u.held.getWorldPosition(p0);const p1=to.position.clone().add(V3(0,1.45,0));
+  sfx('whoosh');
+  const p1v=target===0&&fpv?camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(.35)):p1;
+  if(target===0&&fpv){const f=$('#fpv');f.innerHTML=`<div class="flash"></div><div class="fe">${item.e}</div>`;f.classList.add('show');$('#table').classList.add('rumble');}
+  await tween(720,k=>{const p=p0.clone().lerp(p1v,k);p.y+=Math.sin(k*Math.PI)*(target===0&&fpv?.9:1.7);s.position.copy(p);s.material.rotation=k*14;});
+  scene.remove(s);
+  const sp=sprite('💥',.5);sp.position.copy(p1);scene.add(sp);sfx('hit');
+  bubble(target,`💥 ${item.v} by ${by}!`,1800);
+  const r0=to.userData.facing;
+  tween(650,k=>{sp.scale.setScalar(.5+k*1.6);sp.material.opacity=1-k;to.rotation.z=Math.sin(k*Math.PI*4)*(1-k)*.35;}).then(()=>{scene.remove(sp);to.rotation.z=0;});
+  await raw(520);hint('');
+  if(fpv){await raw(300);camOverride=null;avatars[0].visible=true;$('#fpv').classList.remove('show');$('#fpv').innerHTML='';$('#table').classList.remove('rumble');}
+}
+
+/* ---------- penalties ---------- */
+function runPenalty(target,reason,rule,opts={}){
+  const n=opts.cards||1;
+  return new Promise(res=>{
+    let done=false;const timers=[];
+    const finish=c=>{if(done)return;done=true;timers.forEach(clearTimeout);S.openViolation=null;res(c);};
+    S.openViolation={target,finish};
+    players.forEach((p,i)=>{if(p.bot&&i!==target&&Math.random()<.45)timers.push(setTimeout(()=>finish(i),rnd(650,1850)));});
+    timers.push(setTimeout(()=>finish('mod'),2000));
+  }).then(async c=>{
+    await hit(c,target);
+    drawCards(target,n);
+    let line=`<b>Penalty for ${lowerFirst(reason)}.</b>`;
+    if(n>1)line+=` ${target===0?'You draw':players[target].name+' draws'} ${n}.`;
+    if(opts.quip)line+=' It’s a game like Uno.';
+    mod(line);
+    if(rule){S.discovered.add(rule);renderMoves();}
+    await raw(450);
+  });
+}
+async function falseHuman(){
+  sfx('bad');
+  notice('🚨 Falsely punished!<small>You penalized someone for nothing. Everyone gets you.</small>','',1500);
+  await raw(1000);
+  const c=pick([1,2,3]);await hit(c,0);
+  const c2=pick([1,2,3].filter(x=>x!==c));await hit(c2,0);
+  drawCards(0,2);mod('<b>Penalty for a false penalty.</b> You draw 2.');
+  S.falseQueued=false;await raw(400);
+}
+function falseBot(acc){
+  return new Promise(async res=>{
+    bubble(acc,'PENALTY! 👉',1400);sfx('pen');await raw(700);
+    notice(`🚨 Falsely punished!<small>${players[acc].name} penalized you for nothing.</small><button id="punishBtn">Punish ${players[acc].name}</button>`,'',0);
+    let done=false,t=null;
+    const go=async c=>{if(done)return;done=true;clearTimeout(t);$('#notice').classList.remove('show');
+      await hit(c,acc);drawCards(acc,2);mod(`<b>Penalty for a false penalty.</b> ${players[acc].name} draws 2.`);await raw(400);res();};
+    $('#punishBtn').onclick=()=>go(0);
+    t=setTimeout(()=>go(pick([1,2,3].filter(b=>b!==acc))),2500);
+  });
+}
+function onPenalize(){
+  if(!S.started||S.roundOver)return;
+  sfx('pen');
+  const ov=S.openViolation;
+  if(ov){if(ov.target!==0)ov.finish(0);return;}
+  if(S.falseQueued)return;
+  S.falseQueued=true;queuePenalty(falseHuman);
+}
+
+/* ---------- mao race ---------- */
+function maoRace(goer){
+  return new Promise(res=>{
+    const timers=[];
+    S.mao={goer,first:null,end:null};
+    const end=()=>{timers.forEach(clearTimeout);const m=S.mao;S.mao=null;res(m?m.first:null);};
+    S.mao.end=end;
+    players.forEach((p,i)=>{
+      if(!p.bot)return;
+      if(i===goer){if(Math.random()<.93)timers.push(setTimeout(()=>pressMao(i),rnd(380,1000)));}
+      else if(Math.random()<.3)timers.push(setTimeout(()=>pressMao(i),rnd(550,1600)));
+    });
+    timers.push(setTimeout(end,2200));
+  }).then(async first=>{
+    if(first===goer){await roundWon(goer);return;}
+    await queuePenalty(async()=>{
+      await hit(first==null?'mod':first,goer);drawCards(goer,2);
+      mod(`<b>Penalty for not saying Mao first.</b> ${goer===0?'You draw':players[goer].name+' draws'} 2.`);await raw(400);
+    });
+  });
+}
+function pressMao(i){
+  if(S.mao){
+    if(S.mao.first==null){S.mao.first=i;bubble(i,'MAO!',1500);sfx('mao');if(i===0){$('#mao').classList.add('flash');setTimeout(()=>$('#mao').classList.remove('flash'),500);}const m=S.mao;setTimeout(()=>{if(S.mao===m)m.end();},350);}
+    return;
+  }
+  if(i===0&&S.started&&!S.roundOver&&!S.ignoreMao){bubble(0,'MAO!',1200);queuePenalty(()=>runPenalty(0,'Saying Mao out of turn',null,{cards:2}));}
+}
+
+/* ---------- turns ---------- */
+async function playCard(i,card,suit){
+  const p=players[i];p.hand=p.hand.filter(c=>c.id!==card.id);
+  S.pile.push(card);S.calledSuit=isWild(card)?suit:null;
+  if(card.rank==='7')S.chain++;
+  if(card.rank==='8')S.dir*=-1;
+  if(card.rank==='A')S.skip=true;
+  render();await animCard(i,card);splash();
+}
+function advance(){const step=S.dir*(S.skip?2:1);S.skip=false;S.turn=((S.turn+step)%4+4)%4;}
+
+async function botTurn(i){
+  const p=players[i];
+  await wait(rnd(900,1700));
+  if(Math.random()<.03){bubble(i,pick(['Hmm…','Oops!','Nice one','Ugh','Whoa']));await wait(300);await queuePenalty(()=>runPenalty(i,'Talking','talk'));}
+  const legal=p.hand.filter(isLegal);
+  if(!legal.length){
+    const n=S.chain>0?S.chain:1;drawCards(i,n);S.chain=0;
+    await wait(450);
+    if(Math.random()<.88)bubble(i,'✊ knock knock');
+    else await queuePenalty(()=>runPenalty(i,'Failure to knock','knock'));
+    return;
+  }
+  if(Math.random()<.04){
+    const bad=p.hand.filter(c=>!isLegal(c));
+    if(bad.length){const c=pick(bad);bubble(i,`plays ${cardShort(c)}…`);await wait(500);await queuePenalty(()=>runPenalty(i,'Playing the wrong card',null,{quip:true}));return;}
+  }
+  const plain=legal.filter(c=>!isWild(c));
+  const card=plain.length?pick(plain):legal[0];
+  const req=required(card,S.chain);
+  const lines=[],v=[];
+  for(const r of req){if(Math.random()<.88)lines.push(moveText(r.k,card,r.very));else v.push(r);}
+  const suit=isWild(card)?bestSuit(i):null;
+  await playCard(i,card,suit);
+  if(suit)lines.push(`${suit} ${SUITNAME[suit]}!`);
+  if(lines.length)bubble(i,lines.join(' · '));
+  if(!p.hand.length&&v.length)S.ignoreMao=true;
+  for(const x of v)await queuePenalty(()=>runPenalty(i,x.reason,x.rule));
+  S.ignoreMao=false;
+  if(!p.hand.length)await maoRace(i);
+}
+
+function humanTurn(){
+  return new Promise(res=>{
+    S.humanResolve=res;S.turnLeft=25000;renderStatus();
+    S.turnIv=setInterval(()=>{
+      if(S.paused||S.staged||S.openViolation)return;
+      S.turnLeft-=250;
+      if(S.turnLeft<=0&&S.humanResolve){const r=S.humanResolve;S.humanResolve=null;r({mode:'timeout'});}
+    },250);
+  }).then(async st=>{clearInterval(S.turnIv);await resolveHuman(st);});
+}
+function startStage(mode,card){
+  S.staged={mode,card,said:new Set(),very:0,suit:null};
+  renderHand();renderMoves();renderStatus();
+  const bar=$('#tbar i');bar.style.transition='none';bar.style.width='100%';void bar.offsetWidth;
+  bar.style.transition='width 3s linear';bar.style.width='0%';
+  S.stageTimer=setTimeout(endStage,3000);
+}
+function endStage(){
+  if(!S.staged)return;clearTimeout(S.stageTimer);
+  const st=S.staged;S.staged=null;
+  render();
+  const r=S.humanResolve;S.humanResolve=null;if(r)r(st);
+}
+function saidText(st,card){
+  const parts=[...st.said].map(k=>moveText(k,card,st.very)).filter(Boolean);
+  if(st.suit)parts.push(`${st.suit} ${SUITNAME[st.suit]}!`);
+  return parts.join(' · ');
+}
+async function resolveHuman(st){
+  if(st.mode==='timeout'){
+    await queuePenalty(()=>runPenalty(0,'Delay of game',null));
+    drawCards(0,S.chain>0?S.chain:1);S.chain=0;return;
+  }
+  if(st.mode==='draw'){
+    bubble(0,saidText(st,null));
+    const v=judge([{k:'knock',rule:'knock',reason:'Failure to knock'}],st.said,st.very);
+    for(const x of v)await queuePenalty(()=>runPenalty(0,x.reason,x.rule));
+    return;
+  }
+  const card=st.card;
+  if(!isLegal(card)){bubble(0,saidText(st,card));await queuePenalty(()=>runPenalty(0,'Playing the wrong card',null,{quip:true}));return;}
+  const v=judge(required(card,S.chain),st.said,st.very);
+  const suit=isWild(card)?(st.suit||bestSuit(0)):null;
+  if(isWild(card)&&!st.suit)st.suit=suit;
+  await playCard(0,card,suit);
+  bubble(0,saidText(st,card));
+  if(!players[0].hand.length&&v.length)S.ignoreMao=true;
+  for(const x of v)await queuePenalty(()=>runPenalty(0,x.reason,x.rule));
+  S.ignoreMao=false;
+  if(!players[0].hand.length){await maoRace(0);return;}
+  if(!v.length&&Math.random()<.05)await queuePenalty(()=>falseBot(1+rint(3)));
+}
+
+/* ---------- player input ---------- */
+function tapCard(card){
+  if(!S.started||S.roundOver)return;
+  if(S.poo){queuePenalty(()=>runPenalty(0,'Touching cards during a point of order','poo'));return;}
+  if(S.staged){if(S.staged.mode==='play'){S.staged.card=card;S.staged.suit=null;renderHand();renderStatus();}return;}
+  if(S.turn!==0||!S.humanResolve){queuePenalty(()=>runPenalty(0,'Playing out of turn',null));return;}
+  startStage('play',card);
+}
+function tapDeck(){
+  if(!S.started||S.roundOver||S.staged)return;
+  if(S.poo){queuePenalty(()=>runPenalty(0,'Touching cards during a point of order','poo'));return;}
+  if(S.turn!==0||!S.humanResolve){queuePenalty(()=>runPenalty(0,'Drawing out of turn',null));return;}
+  const n=S.chain>0?S.chain:1;drawCards(0,n);S.chain=0;startStage('draw',null);
+}
+function tapMove(k){
+  const st=S.staged;
+  if(!st){
+    if(!S.started||S.roundOver||S.poo)return;
+    if(isSpeech(k)){bubble(0,k==='very'?'very…':moveText(k,null,0));queuePenalty(()=>runPenalty(0,'Talking','talk'));}
+    return;
+  }
+  if(k==='very')st.very=(st.very+1)%6;
+  else if(st.said.has(k))st.said.delete(k);else st.said.add(k);
+  renderMoves();
+}
+
+/* ---------- point of order + chat ---------- */
+function canPOO(){return S.started&&!S.roundOver&&!S.staged&&!S.openViolation&&!S.mao&&!S.poo;}
+function callPOO(){
+  if(S.poo){queuePenalty(()=>runPenalty(0,'Saying P of O during a P of O','poo'));return;}
+  if(!canPOO())return;
+  S.poo=true;S.paused=true;const id=++S.pooId;
+  bubble(0,'Point of order!');mod('<b>Point of order.</b> Talking is allowed. Hands off your cards.');
+  $('#chatbar').classList.add('show');renderStatus();
+  setTimeout(()=>{if(S.poo&&S.pooId===id){const b=1+rint(3);const n=players[b].name;bubble(b,pick([`${n} thinks someone is cheating.`,`${n} would like a snack.`,`${n} is confused, but ${n} is cool.`,`${n} has no idea what is happening.`]),3000);}},2200);
+  setTimeout(()=>{if(S.poo&&S.pooId===id){const b=1+rint(3);bubble(b,'Point taken.');endPOO();}},rnd(11000,17000));
+}
+function endPOO(){S.poo=false;S.paused=false;mod('<b>Point taken.</b> Silence resumes.');renderStatus();}
+function sendChat(text){
+  const inp=$('#chatIn');text=(text!=null?text:inp.value).trim();inp.value='';
+  if(!text)return;bubble(0,text);
+  if(!S.started||S.roundOver)return;
+  if(!S.poo){queuePenalty(()=>runPenalty(0,'Talking','talk'));return;}
+  if(/point\s*of\s*order|\bp\s*of\s*o\b/i.test(text)){queuePenalty(()=>runPenalty(0,'Saying P of O during a P of O','poo'));return;}
+  if(/point\s*taken/i.test(text)){endPOO();return;}
+  if(/\b(i|me|my|mine|myself|i'm|im|i've|i'll)\b/i.test(text))queuePenalty(()=>runPenalty(0,'Speaking in the first person','poo'));
+}
+
+/* ---------- rounds ---------- */
+async function roundWon(i){
+  S.roundOver=true;S.lastWinner=i;players[i].score++;
+  render();sfx('mao');
+  notice(i===0?'🏆 You win the round!':`🏆 ${players[i].name} wins the round!`,'win',2200);
+  mod(i===0?'You called Mao first. The round is yours.':`${players[i].name} called Mao. Round over.`);
+  await raw(2200);
+}
+async function gameLoop(){
+  while(!S.roundOver){
+    renderSeats();renderStatus();
+    const i=S.turn;
+    if(players[i].bot)await botTurn(i);else await humanTurn();
+    await S.penaltyChain;
+    if(S.roundOver)break;
+    await waitUnpaused();
+    advance();
+  }
+  await afterRound();
+}
+
+/* ---------- the punishment table rush (3D) ---------- */
+let rushState=null;
+function itemSlot(j){return V3(PT.x+(j-1.5)*.95,1.28,PT.z);}
+function itemApproach(j){return V3(PT.x+(j-1.5)*.95,0,PT.z+1.45);}
+function tapItem(j){
+  if(!rushState||!rushState.humanPicks)return;
+  if(players[0].item)return;
+  const me=avatars[0];const d=me.position.distanceTo(itemApproach(j));
+  if(d<1.1){grabItem(j,0);return;}
+  hint(`Walking to the ${rushState.items[j].n.toLowerCase()}…`);
+  walkTo(me,itemApproach(j)).then(()=>{if(rushState&&!players[0].item&&rushState.owners[j]==null)grabItem(j,0);else if(rushState&&!players[0].item)hint('Too slow! Tap another item.');});
+}
+async function grabItem(j,pi){
+  const r=rushState;if(!r||r.owners[j]!=null||players[pi].item)return;
+  r.owners[j]=pi;players[pi].item=r.items[j];
+  const s=itemSprites[j];const av=avatars[pi];
+  const from=s.position.clone(),to=av.position.clone().add(V3(0,1.4,0));
+  sfx('grab');av.userData.facing=Math.atan2(PT.x-av.position.x,PT.z-av.position.z);
+  await tween(380,k=>{s.position.lerpVectors(from,to,ease(k));});
+  s.visible=false;renderSeats();
+  if(pi===0){hint(`Got the ${r.items[j].n.toLowerCase()}! Heading back to your seat.`);}
+  else bubble(pi,`${r.items[j].e} Mine!`,1500);
+  walkTo(av,SEAT_POS[pi]).then(()=>{faceTable(av);r.seated[pi]=true;if(pi===0)hint('');r.check();});
+}
+function itemRush(items,humanPicks,note){
+  return new Promise(res=>{
+    players.forEach(p=>p.item=null);renderSeats();
+    itemSprites.forEach(s=>scene.remove(s));itemSprites=[];
+    items.forEach((it,j)=>{const s=sprite(it.e,.75);s.position.copy(itemSlot(j));s.userData.j=j;scene.add(s);itemSprites.push(s);});
+    phase='rush';
+    const r=rushState={items,humanPicks,owners:items.map(()=>null),seated:[false,false,false,false],done:false};
+    r.check=()=>{
+      if(r.done)return;
+      if(players.every(p=>p.item)&&r.seated.every(x=>x)){r.done=true;rushState=null;phase='seated';hint('');itemSprites.forEach(s=>scene.remove(s));itemSprites=[];clearTimeout(r.fallback);setTimeout(res,400);}
+    };
+    if(humanPicks){
+      hint(note||'Tap the floor to walk to the punishment table, then tap an item to grab it.');
+      mod(note?note:'<b>Rush the punishment table.</b> One item each. Choose wisely.');
+      r.fallback=setTimeout(()=>{if(rushState===r&&!players[0].item){const j=r.owners.indexOf(null);if(j>=0){mod('The Moderator is tired of waiting.');walkTo(avatars[0],itemApproach(j)).then(()=>{if(rushState===r&&!players[0].item&&r.owners[j]==null)grabItem(j,0);});}}},30000);
+    }else{
+      r.seated[0]=true;
+    }
+    [1,2,3].forEach(b=>{
+      setTimeout(async()=>{
+        if(rushState!==r)return;
+        const av=avatars[b];
+        const freeList=()=>r.owners.map((o,k)=>o==null?k:-1).filter(k=>k>=0);
+        const canTake=()=>humanPicks||!!players[0].item||freeList().length>1;
+        let j=pick(freeList());
+        await walkTo(av,itemApproach(j));
+        await raw(rnd(250,900));
+        if(rushState!==r)return;
+        if(r.owners[j]!=null||!canTake()){const f=freeList();j=(f.length&&canTake())?pick(f):-1;}
+        if(j>=0)await grabItem(j,b);
+        else{await walkTo(av,SEAT_POS[b]);faceTable(av);r.seated[b]=true;r.check();}
+      },rnd(300,1600));
+    });
+    if(!humanPicks){
+      const iv=setInterval(()=>{
+        if(rushState!==r){clearInterval(iv);return;}
+        if([1,2,3].every(x=>players[x].item)&&!players[0].item){
+          clearInterval(iv);const j=r.owners.indexOf(null);
+          const s=itemSprites[j];const to=avatars[0].position.clone().add(V3(0,1.4,0));const from=s.position.clone();
+          r.owners[j]=0;players[0].item=items[j];
+          tween(900,k=>{const p=from.clone().lerp(to,ease(k));p.y+=Math.sin(k*Math.PI)*1.5;s.position.copy(p);}).then(()=>{s.visible=false;renderSeats();r.check();});
+        }
+      },300);
+    }
+  });
+}
+
+function makeRoller(box,values,labels,onChange){
+  const el=document.createElement('div');el.className='roller';
+  el.innerHTML='<div class="pad"></div>'+labels.map(l=>`<div class="ri">${l}</div>`).join('')+'<div class="pad"></div>';
+  box.insertBefore(el,box.firstChild);
+  const H=44;let last=0,t=null;
+  const idx=()=>Math.max(0,Math.min(values.length-1,Math.round(el.scrollTop/H)));
+  el.addEventListener('scroll',()=>{clearTimeout(t);t=setTimeout(()=>{const n=idx();if(n!==last){last=n;onChange&&onChange();}},110);},{passive:true});
+  return{el,get:()=>values[idx()],set:n=>el.scrollTo({top:n*H,behavior:'smooth'})};
+}
+function buildRule(){
+  return new Promise(res=>{
+    const ov=overlay(`<div class="panel"><h2>🏆 Make a new rule</h2><p class="sub">Spin the rollers while the others grab their weapons. Nobody else sees this, and it can’t clash with a rule that already exists.</p>
+      <div class="rollwrap" id="rw"></div><div class="preview" id="pv"></div><div class="warn" id="wn"></div>
+      <div class="row"><button class="btn ghost" id="spin">🎰 Spin</button><button class="btn" id="lock">🔒 Lock it in</button></div></div>`);
+    const rw=ov.querySelector('#rw'),pv=ov.querySelector('#pv'),wn=ov.querySelector('#wn'),lock=ov.querySelector('#lock');
+    const col=t=>{const c=document.createElement('div');c.className='rcol';c.innerHTML=`<div class="rt">${t}</div><div class="rbox"><div class="band"></div></div>`;rw.appendChild(c);return c.querySelector('.rbox');};
+    const rankVals=[...RANKS,'JK'],suitVals=['any',...SUITS],actVals=Object.keys(ACTIONS);
+    const bR=col('Card'),bS=col('Suit'),bA=col('Do'),bD=col('What');
+    let rDet=null,detAction=null;
+    const rRank=makeRoller(bR,rankVals,rankVals.map(r=>r==='JK'?'🃏':r),update);
+    const rSuit=makeRoller(bS,suitVals,['Any',...SUITS],update);
+    const rAct=makeRoller(bA,actVals,actVals.map(a=>ACTIONS[a].icon+'<br>'+a),()=>{rebuildDet();update();});
+    function rebuildDet(){const a=rAct.get();if(a===detAction&&rDet)return;if(rDet)rDet.el.remove();detAction=a;rDet=makeRoller(bD,ACTIONS[a].details,ACTIONS[a].details,update);}
+    rebuildDet();
+    function current(){const rank=rRank.get();return{rank,suit:rank==='JK'?'any':rSuit.get(),action:rAct.get(),detail:rDet.get()};}
+    function update(){
+      if(!rDet)return;rebuildDet();
+      const c=current(),a=ACTIONS[c.action];
+      pv.textContent=`When someone plays ${triggerName(c.rank,c.suit)}: ${a.icon} ${a.label(c.detail)}`;
+      const bad=conflicts(c.rank,c.suit);wn.textContent=bad?'That card already has a rule. Pick another card.':'';lock.disabled=bad;
+    }
+    ov.querySelector('#spin').onclick=async()=>{
+      rRank.set(rint(rankVals.length));rSuit.set(rint(suitVals.length));const ai=rint(actVals.length);rAct.set(ai);
+      await raw(700);rebuildDet();rDet.set(rint(ACTIONS[actVals[ai]].details.length));await raw(600);update();
+    };
+    lock.onclick=()=>{const c=current();if(conflicts(c.rank,c.suit))return;ov.remove();res(makeRule(c,0));};
+    update();
+  });
+}
+async function afterRound(){
+  const w=S.lastWinner;
+  const items=shuffle([...ITEMS]).slice(0,4);
+  clearPile();
+  if(w===0){
+    const rush=itemRush(items,false);
+    const rule=await buildRule();
+    S.rules.push(rule);S.discovered.add('c:'+rule.id);
+    await rush;
+    mod(`Your secret rule is set. You got the leftover ${players[0].item.n.toLowerCase()} ${players[0].item.e}.`);
+  }else{
+    const rule=makeBotRule(w);if(rule)S.rules.push(rule);
+    await itemRush(items,true,`${players[w].name} won and is building a secret rule. Rush the table and grab a weapon.`);
+  }
+  newRound();
+}
+function newRound(){
+  S.deck=shuffle(makeDeck());players.forEach(p=>p.hand=[]);
+  for(let k=0;k<7;k++)players.forEach(p=>p.hand.push(S.deck.pop()));
+  S.pile=[S.deck.pop()];S.chain=0;S.dir=1;S.skip=false;
+  S.calledSuit=isWild(S.pile[0])?pick(SUITS):null;
+  S.dealer=(S.dealer+1)%4;S.turn=(S.dealer+1)%4;
+  S.round++;S.roundOver=false;S.started=true;S.penaltyChain=Promise.resolve();
+  phase='seated';clearPile();animCard(-1,S.pile[0]);
+  render();mod(`<b>Round ${S.round}.</b> The deal is done. The Moderator explains nothing.`);
+  gameLoop();
+}
+function designAvatar(){
+  return new Promise(res=>{
+    phase='design';const me=avatars[0];me.userData.facing=0;
+    const d={...me.userData.design};
+    const ov=overlay(`<div class="panel" style="align-self:flex-end"><h2>Design your character</h2>
+      <div class="drow"><span>Skin</span><div id="dSkin" class="sw"></div></div>
+      <div class="drow"><span>Hair</span><div id="dHair" class="sw"></div></div>
+      <div class="drow"><span>Shirt</span><div id="dShirt" class="sw"></div></div>
+      <div class="drow"><span>Hat</span><div id="dHat" class="sw"></div></div>
+      <button class="btn" id="go">Walk in</button></div>`);
+    ov.style.alignItems='flex-end';ov.style.background='transparent';ov.style.pointerEvents='none';ov.querySelector('.panel').style.pointerEvents='auto';
+    const hex=c=>'#'+c.toString(16).padStart(6,'0');
+    const swatches=(id,list,key)=>{const box=ov.querySelector(id);box.innerHTML='';list.forEach(v=>{const b=document.createElement('button');b.className='swb'+(d[key]===v?' on':'');if(key==='hat'){b.textContent={none:'—',cap:'🧢',crown:'👑',bow:'🎀',beanie:'🧶'}[v];}else b.style.background=hex(v);b.onclick=()=>{d[key]=v;applyDesign(me,d);swatches(id,list,key);};box.appendChild(b);});};
+    swatches('#dSkin',SKINS,'skin');swatches('#dHair',HAIRS,'hair');swatches('#dShirt',SHIRTS,'shirt');swatches('#dHat',HATS,'hat');
+    ov.querySelector('#go').onclick=()=>{ov.remove();phase='idle';res();};
+  });
+}
+function howTo(first){
+  const ov=overlay(`<div class="panel">${first?'<h1><span>MAO</span></h1>':'<h2>How to play</h2>'}
+    <p class="sub" style="margin-top:12px">The card game where nobody tells you the rules. You learn them by breaking them.</p>
+    <ul>
+      <li>Tap the floor to walk. Drag on the room to look around.</li>
+      <li>At the punishment table, tap an item to grab it. One each, first come first served.</li>
+      <li>Tap a card to play it. You then have 3 seconds to tap your moves.</li>
+      <li>Can’t play? Draw a card.</li>
+      <li>Catch someone breaking a rule? Smash PENALIZE within 2 seconds. Get it wrong and everyone gets you.</li>
+      <li>Every broken rule costs a card and a hit from someone’s weapon.</li>
+      <li>Win a round and you invent a new secret rule.</li>
+      <li>The rest? Figure it out.</li>
+    </ul>
+    <button class="btn" id="go">${first?'Design my character':'Back to the game'}</button></div>`);
+  ov.querySelector('#go').onclick=async()=>{ov.remove();sfx('grab');if(first){if(threeOK)await designAvatar();itemRush(shuffle([...ITEMS]).slice(0,4),true).then(newRound);}};
+}
+
+/* ---------- wire up ---------- */
+$('#drawBtn').onclick=tapDeck;
+$('#mao').onclick=()=>pressMao(0);
+$('#pen').onclick=onPenalize;
+$('#poo').onclick=callPOO;
+$('#chatBtn').onclick=()=>{$('#chatbar').classList.toggle('show');if($('#chatbar').classList.contains('show'))$('#chatIn').focus();};
+$('#chatSend').onclick=()=>sendChat();
+$('#chatIn').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+$('#ptBtn').onclick=()=>sendChat('Point taken');
+$('#helpBtn').onclick=()=>howTo(false);
+if(!init3D()){$('#table').innerHTML='<div style="color:#fff;padding:20px">The 3D room could not load. Check your connection and reload.</div>';}
+render();
+howTo(true);
+</script>
+</body>
+</html>
