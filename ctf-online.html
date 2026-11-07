@@ -124,6 +124,11 @@ body.js .needs-js{display:none}
 .cv-lights{position:absolute;left:0;right:0;top:0;height:46px;animation:siren .5s steps(2) infinite;background:linear-gradient(90deg,rgba(255,40,60,.55),transparent 35%,transparent 65%,rgba(40,110,255,.55))}
 @keyframes siren{50%{background:linear-gradient(90deg,rgba(40,110,255,.55),transparent 35%,transparent 65%,rgba(255,40,60,.55))}}
 .cv-dash{position:absolute;left:0;right:0;bottom:0;padding:14px 12px calc(env(safe-area-inset-bottom,0px) + 14px);background:linear-gradient(transparent,#1A1D26 40%);color:#fff;font-weight:800;text-align:center;font-size:1.05rem}
+#pipBox{position:fixed;left:calc(env(safe-area-inset-left,0px) + 10px);top:calc(env(safe-area-inset-top,0px) + 118px);width:min(46vw,260px);height:min(30vw,160px);border:4px solid #1A1D26;border-radius:16px;z-index:5;pointer-events:none;box-shadow:0 0 0 3px rgba(255,255,255,.7),0 6px 16px rgba(0,0,0,.3);animation:pipglow .6s steps(2) infinite}
+@keyframes pipglow{50%{border-color:#C8102E}}
+#pipBox[hidden]{display:none!important}
+#pipTag{position:absolute;left:6px;top:6px;background:#FF2D55;color:#fff;font-weight:800;font-size:.7rem;border-radius:8px;padding:2px 7px}
+#pipText{position:absolute;left:0;right:0;bottom:0;background:rgba(26,29,38,.75);color:#fff;font-weight:800;font-size:.72rem;text-align:center;padding:3px 6px;border-radius:0 0 10px 10px}
 #replayBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 112px);transform:translateX(-50%);z-index:7;background:#FF2D55;color:#fff;font:800 1.2rem "Baloo 2",system-ui,sans-serif;padding:8px 18px;border-radius:14px;letter-spacing:.06em;box-shadow:0 5px 0 #B3123A;animation:rp 1s ease-in-out infinite}
 @keyframes rp{50%{transform:translateX(-50%) scale(1.06)}}
 .cornerLeave{position:fixed;right:calc(env(safe-area-inset-right,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);border:0;border-radius:16px;padding:10px 16px;background:var(--panel);color:var(--muted);font:800 1rem "Baloo 2",system-ui,sans-serif;box-shadow:0 4px 0 rgba(42,27,61,.18);z-index:11}
@@ -137,6 +142,7 @@ body.js .needs-js{display:none}
 <div id="toast" role="status"></div>
 <div id="count"></div>
 <div id="carView" hidden><div class="cv-lights"></div><div class="cv-dash">🚔 Officer Pat is driving you back to your side…</div></div>
+<div id="pipBox" hidden><div id="pipTag">🚔 LIVE COP CAM</div><div id="pipText"></div></div>
 <div id="replayBar" hidden>🎬 INSTANT REPLAY ⏩</div>
 <div id="joyHint" hidden>Drag here<br>to move</div>
 <div id="kbHint" hidden>WASD or arrows to move · Space jump · Shift sprint · E help · drag to look</div>
@@ -835,6 +841,7 @@ function startMatch(assign,fl,mi,mid){
   if(me)toast(`You’re ${me.name} on the ${TNAME[me.team]} team in ${MAPS[mi].e} ${MAPS[mi].name}! Grab their flag and bring it back. First to 3 wins! 🚩`,4400);
 }
 function hideGame(){
+  $("#pipBox").hidden=true;
   C.replay=null;$("#replayBar").hidden=true;$("#carView").hidden=true;HIST.length=0;
   G.playing=false;C.phase="off";C.me=-1;units.forEach(u=>{u.c.visible=false});Object.values(flags).forEach(f=>{f.mesh.visible=false;f.ring.visible=false;f.home=null});
   powerups.forEach(p=>FIELD.remove(p.obj));powerups.length=0;
@@ -1058,6 +1065,27 @@ document.addEventListener("contextmenu",e=>e.preventDefault());
 const camPos=new THREE.Vector3();
 function camTarget(){const p=MEU().c.position,D=innerWidth<innerHeight?11:9.5,H=innerWidth<innerHeight?6:5.2;return new THREE.Vector3(p.x+Math.sin(G.camYaw)*D,p.y+H,p.z+Math.cos(G.camYaw)*D)}
 function snapCam(){if(MEU()){camPos.copy(camTarget());camera.position.copy(camPos)}}
+const pipCam=new THREE.PerspectiveCamera(55,1.6,.1,300),pipPos=new THREE.Vector3();let pipTeam=null;
+function pipPick(){const me=MEU();if(!G.playing||C.replay||!me||me.riding||me.mustReturn)return null;
+  // only players sitting in jail, or standing near a jail, get the cop cam
+  const p=me.c.position,act=["blue","red"].filter(tm=>COP[tm].st!=="idle"&&((me.jailed&&tm===me.team)||Math.hypot(p.x-JAIL[tm].x,p.z-JAIL[tm].z)<16));
+  if(!act.length)return null;return act.includes(me.team)?me.team:act[0]}
+function pipRender(dt,t){
+  const tm=pipPick(),box=$("#pipBox");
+  if(!tm){if(!box.hidden)box.hidden=true;pipTeam=null;return}
+  const c=COP[tm],gy=ground(c.x,c.z),cs=Math.sin(c.ry),cc=Math.cos(c.ry);
+  const want=new THREE.Vector3(c.x-cs*7+cc*3.5,gy+4.2,c.z-cc*7-cs*3.5);
+  if(pipTeam!==tm){pipPos.copy(want);pipTeam=tm}else pipPos.lerp(want,Math.min(1,4*dt));
+  pipCam.position.copy(pipPos);pipCam.lookAt(c.x,gy+1,c.z);
+  const riders=units.filter(u=>u.team===tm&&u.mustReturn).map(u=>u.name);
+  const txt=(riders.length?riders.join(" & "):"The cop car")+(riders.some(n=>units.find(u=>u.name===n).riding)?" riding home 🚔":" getting picked up 🚔");
+  if(box.hidden)box.hidden=false;if($("#pipText").textContent!==txt)$("#pipText").textContent=txt;
+  const r=box.getBoundingClientRect();if(!r.width)return;
+  const x=r.left+4,w=r.width-8,h=r.height-8,y=innerHeight-(r.top+4)-h;
+  pipCam.aspect=w/h;pipCam.updateProjectionMatrix();
+  renderer.setScissorTest(true);renderer.setScissor(x,y,w,h);renderer.setViewport(x,y,w,h);renderer.render(scene,pipCam);
+  renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,innerHeight);
+}
 const clock=new THREE.Clock();
 function frame(){
   const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;nowT=t;
@@ -1072,7 +1100,7 @@ function frame(){
   else if(G.playing&&MEU()){const ct=camTarget();camPos.lerp(ct,Math.min(1,6*dt));const gy=ground(camPos.x,camPos.z)+1.5;if(camPos.y<gy)camPos.y=gy;camera.position.copy(camPos);const p=MEU().c.position;camera.lookAt(p.x,p.y+2,p.z)}
   else{const a=t*.08;camera.position.set(Math.sin(a)*58,30,Math.cos(a)*58);camera.lookAt(0,0,0)}
   if(toastT>0){toastT-=dt;if(toastT<=0)$("#toast").classList.remove("on")}
-  renderer.render(scene,camera);requestAnimationFrame(frame);
+  renderer.render(scene,camera);pipRender(dt,t);requestAnimationFrame(frame);
 }
 function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<innerHeight?68:58;camera.updateProjectionMatrix()}
 addEventListener("resize",resize);resize();
