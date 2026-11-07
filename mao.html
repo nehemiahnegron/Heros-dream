@@ -349,6 +349,12 @@ const ray=new THREE.Raycaster();
 const avatars=[];
 let camYaw=0,camPitch=-.1,phase='idle',threeOK=false;
 const joy={id:null,ox:0,oy:0,dx:0,dy:0};
+const keysDown=new Set();const MOVE_KEYS={w:1,a:1,s:1,d:1,arrowup:1,arrowdown:1,arrowleft:1,arrowright:1};
+const isTyping=()=>{const t=document.activeElement;return t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);};
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(!MOVE_KEYS[k]||isTyping())return;keysDown.add(k);if(phase==='rush')e.preventDefault();});
+addEventListener('keyup',e=>keysDown.delete(e.key.toLowerCase()));
+addEventListener('blur',()=>keysDown.clear());
+function moveInput(){let x=joy.dx,y=joy.dy;if(keysDown.size&&!isTyping()){const h=(keysDown.has('d')||keysDown.has('arrowright')?1:0)-(keysDown.has('a')||keysDown.has('arrowleft')?1:0);const v=(keysDown.has('s')||keysDown.has('arrowdown')?1:0)-(keysDown.has('w')||keysDown.has('arrowup')?1:0);if(h||v){x=h;y=v;}}return{x,y};}
 function showJoy(x,y,dx,dy){const j=$('#joy');j.style.display='block';j.style.left=(x-45)+'px';j.style.top=(y-45)+'px';$('#joyKnob').style.transform=`translate(${dx}px,${dy}px)`;}
 function hideJoy(){$('#joy').style.display='none';}
 
@@ -501,9 +507,10 @@ function swing(u,sw){u.parts.legs[0].rotation.x=sw*.65;u.parts.legs[1].rotation.
 function stepAvatars(dt){
   for(const a of avatars){
     const u=a.userData;
-    if(a===avatars[ME]&&!u.target&&phase==='rush'&&(joy.dx||joy.dy)){
+    const mi=moveInput();
+    if(a===avatars[ME]&&!u.target&&phase==='rush'&&(mi.x||mi.y)){
       const fx=-Math.sin(camYaw),fz=-Math.cos(camYaw),rx=Math.cos(camYaw),rz=-Math.sin(camYaw);
-      const vx=fx*(-joy.dy)+rx*joy.dx,vz=fz*(-joy.dy)+rz*joy.dx;const L=Math.hypot(vx,vz);
+      const vx=fx*(-mi.y)+rx*mi.x,vz=fz*(-mi.y)+rz*mi.x;const L=Math.hypot(vx,vz);
       if(L>.05){a.position.x+=vx/L*Math.min(1,L)*u.speed*dt;a.position.z+=vz/L*Math.min(1,L)*u.speed*dt;
         a.position.x=Math.max(-11,Math.min(11,a.position.x));a.position.z=Math.max(-11,Math.min(11,a.position.z));
         const d=Math.hypot(a.position.x,a.position.z);if(d<2.9){a.position.x*=2.9/d;a.position.z*=2.9/d;}
@@ -1044,7 +1051,7 @@ function rushStartFx(items,note){
   items.forEach((it,j)=>{const s=sprite(it.e,.75);s.position.copy(itemSlot(j));s.userData.j=j;scene.add(s);itemSprites.push(s);});
   players.forEach((p,i)=>{if(avatars[i])setHeld(avatars[i],null);});
   phase='rush';camYaw=Math.atan2(avatars[ME].position.x-PT.x,avatars[ME].position.z-PT.z);camPitch=-.1;
-  $('#hint').textContent=note||'Left thumb to walk, right side to look around. Tap an item to grab it.';
+  $('#hint').textContent=note||(matchMedia('(pointer:fine)').matches?'WASD or arrow keys to walk, drag to look around. Click an item to grab it.':'Left thumb to walk, right side to look around. Tap an item to grab it.');
 }
 function grabFx(j,pi){
   const s=itemSprites[j];const av=avatars[pi];if(!s||!av)return;
@@ -1365,7 +1372,7 @@ function howTo(first){
   const ov=overlay(`<div class="panel">${first?'<h1><span>MAO</span></h1>':'<h2>How to play</h2>'}
     <p class="sub" style="margin-top:12px">The card game where nobody tells you the rules. You learn them by breaking them.</p>
     <ul>
-      <li>Walk with your left thumb, look around with your right. Tap an item to grab it.</li>
+      <li>Walk with your left thumb, look around with your right. Tap an item to grab it. On a computer: WASD or arrow keys to walk, drag the mouse to look.</li>
       <li>Tap a card to play it. You then have 3 seconds to tap your moves.</li>
       <li>Can’t play? Draw a card. You get 10 seconds a turn.</li>
       <li>Catch someone breaking a rule? Smash PENALIZE within 2 seconds. Get it wrong and everyone gets you.</li>
