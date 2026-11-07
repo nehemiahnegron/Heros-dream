@@ -129,6 +129,10 @@ body.js .needs-js{display:none}
 #pipBox[hidden]{display:none!important}
 #pipTag{position:absolute;left:6px;top:6px;background:#FF2D55;color:#fff;font-weight:800;font-size:.7rem;border-radius:8px;padding:2px 7px}
 #pipText{position:absolute;left:0;right:0;bottom:0;background:rgba(26,29,38,.75);color:#fff;font-weight:800;font-size:.72rem;text-align:center;padding:3px 6px;border-radius:0 0 10px 10px}
+#plantBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 112px);transform:translateX(-50%);z-index:7;background:var(--panel);color:var(--panel-ink);font:800 1.05rem/1.25 "Baloo 2",system-ui,sans-serif;padding:8px 16px;border-radius:16px;box-shadow:0 5px 0 rgba(42,27,61,.18);text-align:center;width:min(92vw,440px)}
+#plantBar b{font-size:1.5rem;color:#FF2D55}
+#plantBtn{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 132px);transform:translateX(-50%);z-index:7;white-space:nowrap;animation:rp 1s ease-in-out infinite}
+#plantBar[hidden],#plantBtn[hidden]{display:none!important}
 #replayBar{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 112px);transform:translateX(-50%);z-index:7;background:#FF2D55;color:#fff;font:800 1.2rem "Baloo 2",system-ui,sans-serif;padding:8px 18px;border-radius:14px;letter-spacing:.06em;box-shadow:0 5px 0 #B3123A;animation:rp 1s ease-in-out infinite}
 @keyframes rp{50%{transform:translateX(-50%) scale(1.06)}}
 .cornerLeave{position:fixed;right:calc(env(safe-area-inset-right,0px) + 14px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);border:0;border-radius:16px;padding:10px 16px;background:var(--panel);color:var(--muted);font:800 1rem "Baloo 2",system-ui,sans-serif;box-shadow:0 4px 0 rgba(42,27,61,.18);z-index:11}
@@ -143,6 +147,8 @@ body.js .needs-js{display:none}
 <div id="count"></div>
 <div id="carView" hidden><div class="cv-lights"></div><div class="cv-dash">🚔 Officer Pat is driving you back to your side…</div></div>
 <div id="pipBox" hidden><div id="pipTag">🚔 LIVE COP CAM</div><div id="pipText"></div></div>
+<div id="plantBar" hidden></div>
+<button class="big" id="plantBtn" hidden>🚩 Plant our flag here</button>
 <div id="replayBar" hidden>🎬 INSTANT REPLAY ⏩</div>
 <div id="joyHint" hidden>Drag here<br>to move</div>
 <div id="kbHint" hidden>WASD or arrows to move · Space jump · Shift sprint · E help · drag to look</div>
@@ -565,6 +571,24 @@ function resetPoint(){
     notify(u,{k:"reset",x:u.c.position.x,z:u.c.position.z})});
   C.phase="count";C.countT=4;
 }
+/* ---------- flag planting: each team lead plants, everyone watches from above ---------- */
+function fixRoles(){["blue","red"].forEach(tm=>{const bots=units.filter(u=>u.team===tm&&!u.human);bots.forEach(u=>{u.baseRole=ROSTER[u.i].role;if(u.forceT<=0)u.role=u.baseRole});
+  ["defend","defend","rescue"].forEach((need,k)=>{const have=bots.filter(u=>u.baseRole===need).length,want=need==="defend"?(bots.length>=4?2:1):1;if(have>=want||bots.length<3)return;const pick=bots.find(u=>u.baseRole==="attack"||u.baseRole==="intercept");if(pick){pick.baseRole=need;pick.role=need}})})}
+function teamLead(tm){const h=units.filter(u=>u.team===tm&&u.human);return (h.length?h[0]:units.find(u=>u.team===tm)).i}
+function plantOK(tm,x,z){const s=tm==="blue"?1:-1;if(z*s<12)return "Too close to the middle! Go deeper into your side 🏃";const j=JAIL[enemyOf(tm)];if(Math.hypot(x-j.x,z-j.z)<7)return "Not in the jail! Pick another spot 🔒";if(topRect(x,z))return "Put it on the ground, not on a ramp or slide 🛝";if(bushes.some(b=>Math.hypot(x-b[0],z-b[1])<2.2))return "Too close to that bush, step away a little";return null}
+function nearestOK(tm,x,z){if(!plantOK(tm,x,z))return [x,z];for(let r=1;r<40;r++)for(let a=0;a<16;a++){const nx=clampX(x+Math.cos(a/16*PI*2)*r),nz=Math.max(-44,Math.min(44,z+Math.sin(a/16*PI*2)*r));if(!plantOK(tm,nx,nz))return [nx,nz]}const sp=FLAG_SPOTS[0],s=tm==="blue"?1:-1;return [sp[0]*s,sp[1]*s]}
+function startPlantTurn(tm){C.phase="plant";C.plantTeam=tm;C.plantT=10;C.botT=null;const lu=units[C.lead[tm]];
+  notifyAll({k:"plantTurn",team:tm});}
+function plantAt(tm,x,z,auto){const q=nearestOK(tm,x,z);plantFlag(tm,q[0],q[1]);C.phase="view";C.viewTeam=tm;C.viewT=3.2;
+  notifyAll({k:"planted",team:tm,x:q[0],z:q[1],auto:auto?1:0,by:units[C.lead[tm]].name});NET.snapT=0}
+function requestPlant(u){if(!u||C.phase!=="plant"||C.lead[C.plantTeam]!==u.i)return;const x=u.c.position.x,z=lz(u),err=plantOK(u.team,x,z);if(err){notify(u,{k:"toast",m:err,ms:2200});return}plantAt(u.team,x,z,false)}
+function plantLoop(dt){
+  if(C.phase==="plant"){C.plantT-=dt;const lu=units[C.lead[C.plantTeam]];
+    if(!lu.human){if(!C.botT){const sp=FLAG_SPOTS[Math.floor(Math.random()*FLAG_SPOTS.length)],s=C.plantTeam==="blue"?1:-1;C.botT={x:sp[0]*s,z:sp[1]*s,wait:1.2}}
+      if(C.botT.wait>0)C.botT.wait-=dt;else if(moveUnit(lu,C.botT.x,C.botT.z,dt)<1){plantAt(C.plantTeam,lu.c.position.x,lz(lu),false);return}}
+    if(C.plantT<=0)plantAt(C.plantTeam,lu.c.position.x,lz(lu),true);}
+  else if(C.phase==="view"){C.viewT-=dt;if(C.viewT<=0){if(C.viewTeam==="blue")startPlantTurn("red");else{C.phase="count";C.countT=5;notifyAll({k:"toast",m:"Both flags are planted! Get ready… 🚩",ms:2200})}}}
+}
 function tagUnit(v,by){
   if(v.carrying){const f=v.carrying;f.carrier=null;f.dropped=true;f.dropT=8;f.x=v.c.position.x;f.z=lz(v);v.carrying=null}
   v.jailed=true;v.mustReturn=false;v.riding=false;const j=JAIL[v.team];const n=units.filter(m=>m.team===v.team&&m.jailed).length-1;const a=n*1.05;
@@ -657,10 +681,11 @@ function hostUpdate(dt,t){
   if(C.replay){replayUpdate(dt);return}
   units.forEach(u=>{["immuneT","shieldT","frozenT","speedT","forceT","helpCD"].forEach(k=>{if(u[k]>0)u[k]=Math.max(0,u[k]-dt)});
     if(!u.human){if(u.forceT<=0)u.role=u.baseRole;if(u.sprintT>0){u.sprintT-=dt;if(u.sprintT<=0){u.sprintT=0;u.sprintCD=3}}else if(u.sprintCD>0)u.sprintCD=Math.max(0,u.sprintCD-dt)}});
+  if(C.phase==="plant"||C.phase==="view")plantLoop(dt);
   if(C.phase==="count"){C.countT-=dt;if(C.countT<=0){C.countT=0;C.phase="play";notifyAll({k:"go"})}}
   if(C.phase==="play"){C.time-=dt;if(C.time<=0){C.time=0;endCTF()}}
   units.forEach(u=>{
-    if(!u.human){if(C.phase==="over")animChar(u.c,0,t,dt);else aiUnit(u,dt);return}
+    if(!u.human){if(C.phase==="over")animChar(u.c,0,t,dt);else if(C.phase==="plant"&&C.lead[C.plantTeam]===u.i){}else aiUnit(u,dt);return}
     if(u.i===C.me)return;
     if(u.ignoreNetT>0)u.ignoreNetT-=dt;
     const n=u.net;if(!n||u.mustReturn||u.ignoreNetT>0){animChar(u.c,0,t,dt);return}
@@ -678,7 +703,8 @@ function sendSnap(){
   if(NET.mode!=="host"||!Object.keys(NET.conns).length)return;
   broadcast({t:"s",ph:C.phase,tm:r2(C.time),ct:r2(C.countT),sc:[C.score.blue,C.score.red],
     u:units.map(u=>{const p=u.c.position;return [r2(p.x),r2(p.y),r2(p.z),r2(u.c.rotation.y),bits(u)]}),
-    f:["blue","red"].map(tm=>{const f=flags[tm];return [r2(f.x),r2(f.z),f.carrier?f.carrier.i:-1,f.dropped?1:0]}),
+    f:["blue","red"].map(tm=>{const f=flags[tm];return [r2(f.x),r2(f.z),f.carrier?f.carrier.i:-1,f.dropped?1:0,f.home?r2(f.home.x):0,f.home?r2(f.home.z):0,f.home?1:0]}),
+    pl:[C.plantTeam||"blue",r2(C.plantT||0),C.lead.blue,C.lead.red,C.viewTeam||"blue",r2(C.viewT||0)],
     p:powerups.map(q=>[q.id,r2(q.x),r2(q.z),PU.indexOf(q.type)]),
     k:["blue","red"].map(tm=>{const c=COP[tm];return [r2(c.x),r2(c.z),r2(c.ry),c.st==="idle"?0:1]})});
 }
@@ -686,7 +712,8 @@ function applySnap(m){
   C.phase=m.ph;C.time=m.tm;C.countT=m.ct;C.score={blue:m.sc[0],red:m.sc[1]};
   m.u.forEach((a,i)=>{const u=units[i];u.tgt={x:a[0],y:a[1],z:a[2],ry:a[3]};const b=a[4];u.jailed=!!(b&1);u.shieldT=b&2?1:0;u.immuneT=b&4?1:0;u.frozenT=b&8?1:0;u.speedT=b&16?1:0;u.mustReturn=!!(b&32);u.sprintT=b&64?1:0;u.riding=!!(b&128)});
   if(m.k)["blue","red"].forEach((tm,k)=>{const c=COP[tm],a=m.k[k];if(c.st==="idle"&&a[3]){c.x=a[0];c.z=a[1];c.ry=a[2]}c.tx=a[0];c.tz=a[1];c.try=a[2];c.st=a[3]?"drive":"idle"});
-  ["blue","red"].forEach((tm,k)=>{const f=flags[tm],a=m.f[k];f.x=a[0];f.z=a[1];f.carrier=a[2]>=0?units[a[2]]:null;f.dropped=!!a[3]});
+  if(m.pl){C.plantTeam=m.pl[0];C.plantT=m.pl[1];C.lead={blue:m.pl[2],red:m.pl[3]};C.viewTeam=m.pl[4];C.viewT=m.pl[5]}
+  ["blue","red"].forEach((tm,k)=>{const f=flags[tm],a=m.f[k];if(a[6]&&!f.home)plantFlag(tm,a[4],a[5]);else if(!a[6]&&f.home){f.home=null;f.mesh.visible=false;f.ring.visible=false}f.x=a[0];f.z=a[1];f.carrier=a[2]>=0?units[a[2]]:null;f.dropped=!!a[3]});
   units.forEach(u=>u.carrying=null);Object.values(flags).forEach(f=>{if(f.carrier)f.carrier.carrying=f});
   const want=new Map(m.p.map(q=>[q[0],q]));
   for(let i=powerups.length-1;i>=0;i--){if(!want.has(powerups[i].id)){FIELD.remove(powerups[i].obj);powerups.splice(i,1)}}
@@ -695,6 +722,8 @@ function applySnap(m){
 function clientUpdate(dt,t){
   if(C.replay){replayUpdate(dt);return}
   if(C.phase==="count")C.countT=Math.max(0,C.countT-dt);
+  if(C.phase==="plant")C.plantT=Math.max(0,C.plantT-dt);
+  if(C.phase==="view")C.viewT=Math.max(0,C.viewT-dt);
   if(C.phase==="play")C.time=Math.max(0,C.time-dt);
   ["blue","red"].forEach(tm=>{const c=COP[tm];if(c.st==="idle"||c.tx===undefined)return;const k=Math.min(1,dt*10);c.x+=(c.tx-c.x)*k;c.z+=(c.tz-c.z)*k;c.ry=lerpAngle(c.ry,c.try,k)});
   units.forEach(u=>{if((u.i===C.me&&!u.mustReturn)||!u.tgt)return;
@@ -706,13 +735,14 @@ function clientUpdate(dt,t){
 /* ---------- your own player (every device) ---------- */
 let jumpQueued=false,jumpHeld=false;
 function sprint(){const u=MEU();if(!G.playing||!u||u.jailed||u.frozenT>0||G.sprintT>0||G.sprintCD>0||(C.phase!=="play"&&C.phase!=="count"))return;G.sprintT=1.2;if(ac){tone(330,ac.currentTime,.12,"sawtooth",.05);tone(660,ac.currentTime+.06,.15,"triangle",.07)}}
+function askPlant(){if(G.playing&&C.phase==="plant"&&C.lead[C.plantTeam]===C.me)sendHost({t:"act",k:"plant"})}
 function askHelp(){if(!G.playing||C.phase!=="play")return;sendHost({t:"act",k:"help"})}
 function localUpdate(dt,t){
   const u=MEU();if(!u||C.replay)return;
   if(G.sprintT>0){G.sprintT-=dt;if(G.sprintT<=0){G.sprintT=0;G.sprintCD=3}}else if(G.sprintCD>0)G.sprintCD=Math.max(0,G.sprintCD-dt);
   if(G.superT>0)G.superT-=dt;if(G.manualT>0)G.manualT-=dt;
   if(u.mustReturn){if(!u.riding)animChar(u.c,0,t,dt);G.vy=0;G.grounded=true;return}
-  const active=C.phase==="count"||C.phase==="play",canMove=active&&u.frozenT<=0,p=u.c.position;
+  const active=C.phase==="count"||C.phase==="play"||(C.phase==="plant"&&C.lead[C.plantTeam]===C.me),canMove=active&&u.frozenT<=0,p=u.c.position;
   let ix=0,iz=0;
   if(keys["a"]||keys["arrowleft"])ix-=1;if(keys["d"]||keys["arrowright"])ix+=1;
   if(keys["w"]||keys["arrowup"])iz+=1;if(keys["s"]||keys["arrowdown"])iz-=1;
@@ -759,7 +789,14 @@ function hud(){
   const m=Math.floor(C.time/60),s=Math.floor(C.time%60);
   $("#ctfScore").textContent=`🔵 ${C.score.blue} – ${C.score.red} 🔴`;$("#ctfTime").textContent=`⏱ ${m}:${String(s).padStart(2,"0")}`;
   const myF=flags[me.team];let st;
-  if(C.phase==="replay")st="🎬 Instant replay!";
+  const iLead=C.phase==="plant"&&C.lead[C.plantTeam]===C.me,pb=$("#plantBar");
+  if(C.phase==="plant"||C.phase==="view"){const lu=units[C.lead[C.phase==="plant"?C.plantTeam:C.viewTeam]],tn=C.phase==="plant"?C.plantTeam:C.viewTeam;
+    const html=C.phase==="view"?`🚩 The ${TNAME[tn]} flag is planted here!`:iLead?`🚩 You’re the team lead! Plant your flag <b>${Math.ceil(C.plantT)}</b><br><small>Time’s up = it drops right where you are</small>`:`👀 ${lu.name}${lu.pname?` (${lu.pname})`:""} is planting the ${TNAME[tn]} flag… <b>${Math.ceil(C.plantT)}</b>`;
+    if(pb.innerHTML!==html)pb.innerHTML=html;pb.hidden=false}else pb.hidden=true;
+  $("#plantBtn").hidden=!iLead;$("#controls").hidden=C.phase==="plant"&&!iLead||C.phase==="view";
+  if(C.phase==="plant")st=iLead?"Walk to a sneaky spot on your side":"Watching the flag get planted";
+  else if(C.phase==="view")st="Remember where it is! 👀";
+  else if(C.phase==="replay")st="🎬 Instant replay!";
   else if(C.phase==="count")st="Get ready… stay on your side";
   else if(C.phase==="over")st="Game over!";
   else if(me.jailed)st="🔒 You’re in jail. Tap 📣 Help!";
@@ -792,6 +829,11 @@ function handleEv(ev){
   else if(ev.k==="jailed"){const u=MEU();if(u){u.jailed=true;u.mustReturn=false;u.c.position.set(ev.x,ground(ev.x,ev.z),ev.z)}G.vy=0;G.grounded=true;G.sprintT=0;snapCam();chime([440,330,262],.1,.3,"triangle",.1);toast(`🔒 ${ev.by} tagged you! You’re in jail. Wait for a teammate, or tap 📣 Help!`,3400)}
   else if(ev.k==="super")G.superT=8;
   else if(ev.k==="bail")bailFx(ev.x,ev.z);
+  else if(ev.k==="plantTurn"){C.phase="plant";C.plantTeam=ev.team;C.plantT=10;const lu=units[C.lead[ev.team]];camPos.copy(camera.position);
+    if(C.lead[ev.team]===C.me){toast("🚩 You’re the team lead! Walk somewhere sneaky on your side and tap Plant. 10 seconds!",3600);chime([659,880,1175],.08,.3)}
+    else toast(`👀 Everyone watch: ${lu.name}${lu.pname?` (${lu.pname})`:""} is planting the ${TNAME[ev.team]} flag!`,3000)}
+  else if(ev.k==="planted"){if(!isHost())plantFlag(ev.team,ev.x,ev.z);C.phase="view";C.viewTeam=ev.team;C.viewT=3.2;camPos.copy(camera.position);chime([523,784,1047],.08,.35);
+    toast(`${ev.auto?"⏰ Time’s up! ":""}🚩 The ${TNAME[ev.team]} flag is planted right here!`,3000)}
   else if(ev.k==="replay"){C.phase="replay";const w=units[ev.who];C.replay={fr:ev.fr,who:ev.who,ft:ev.ft,dur:ev.dur,over:ev.over,t:0,ang:(w?w.c.rotation.y:0)+PI*.75};$("#replayBar").hidden=false;$("#replayBar").textContent=`🎬 INSTANT REPLAY ⏩ ${w?w.name:""} scores!`;$("#carView").hidden=true;$("#redTint").classList.remove("on");camPos.copy(camera.position);if(ac){tone(1046,ac.currentTime,.12,"square",.05);tone(1568,ac.currentTime+.1,.2,"square",.05)}}
   else if(ev.k==="booted"){const u=MEU();if(u){u.mustReturn=false;u.riding=false;u.c.position.set(ev.x,ground(ev.x,ev.z),ev.z);u.c.rotation.y=ev.ry;G.heroYaw=ev.ry}G.vy=9;G.grounded=false;G.jumps=1;snapCam();if(ac){tone(196,ac.currentTime,.15,"square",.07);tone(392,ac.currentTime+.08,.25,"triangle",.08)}toast("👢 Out you go! You’re free, go get ’em!",2400)}
   else if(ev.k==="reset"){const u=MEU();if(u){Object.assign(u,{jailed:false,mustReturn:false,riding:false});u.c.position.set(ev.x,ground(ev.x,ev.z),ev.z);G.heroYaw=u.team==="red"?0:PI;G.camYaw=u.team==="red"?PI:0;u.c.rotation.y=G.heroYaw}Object.assign(G,{vy:0,grounded:true,jumps:0,sprintT:0,sprintCD:0,superT:0});C.phase="count";C.countT=4;snapCam()}
@@ -816,7 +858,7 @@ function pickMap(){const c=NET.cfg;if(c.mapMode==="host")return c.map;const v=ta
 function freeSeat(){const cnt={blue:0,red:0};NET.players.forEach(p=>{if(p.idx>=0)cnt[ROSTER[p.idx].team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const tm of order){const i=ROSTER.findIndex((r,k)=>r.team===tm&&!NET.players.some(p=>p.idx===k));if(i>=0)return i}return -1}
 function hostStart(){
   NET.players.forEach(p=>{if(p.idx<0)p.idx=freeSeat()});
-  const mi=pickMap(),fl=pickFlags(mi);
+  const mi=pickMap(),fl=null;
   const assign=NET.players.filter(p=>p.idx>=0).map(p=>({id:p.id,name:p.name,idx:p.idx,look:p.look||null}));
   broadcast({t:"start",assign,fl,map:mi});startMatch(assign,fl,mi);
 }
@@ -827,20 +869,23 @@ function startMatch(assign,fl,mi,mid){
   assign.forEach(a=>{const u=units[a.idx];if(!u)return;u.human=a.id;u.pname=a.name;applyLook(u,a.look)});
   units.forEach(u=>{if(!u.human)applyLook(u,null);u.tagR=u.human?1.5:(ROSTER[u.i].tagR||1.15);setLabel(u);u.c.visible=true});
   C.me=units.findIndex(u=>u.human===NET.myId);
-  Object.assign(C,{phase:"count",countT:5,time:240,score:{blue:0,red:0},puT:5});
+  Object.assign(C,{phase:"plant",plantTeam:"blue",plantT:10,viewTeam:"blue",viewT:0,botT:null,countT:0,time:240,score:{blue:0,red:0},puT:5,lead:{blue:teamLead("blue"),red:teamLead("red")}});
+  fixRoles();
   let bi=0,ri=0;
   units.forEach(u=>{Object.assign(u,{jailed:false,mustReturn:false,riding:false,ignoreNetT:0,immuneT:0,shieldT:0,frozenT:0,speedT:0,forceT:0,helpCD:0,sprintT:0,sprintCD:0,role:u.baseRole,carrying:null,think:0,waitT:2+Math.random()*5,stuckT:0,vy:0,wantSprint:false});
     const lp=linePos(u,u.team==="blue"?bi++:ri++),x=lp.x,z=lp.z;u.c.position.set(x,ground(x,z),z);confine(u);u.c.position.y=ground(u.c.position.x,u.c.position.z);u.c.rotation.y=u.team==="blue"?PI:0;u.tx=x;u.tz=z});
   ["blue","red"].forEach(tm=>Object.assign(COP[tm],{st:"idle",riders:[],path:[],tx:undefined}));
-  plantFlag("blue",fl[0][0],fl[0][1]);plantFlag("red",fl[1][0],fl[1][1]);
+  Object.values(flags).forEach(f=>{f.home=null;f.carrier=null;f.dropped=false;f.mesh.visible=false;f.ring.visible=false});
+  if(fl){plantFlag("blue",fl[0][0],fl[0][1]);plantFlag("red",fl[1][0],fl[1][1])}
   powerups.forEach(p=>FIELD.remove(p.obj));powerups.length=0;puId=0;
   const me=MEU();
   Object.assign(G,{camYaw:me&&me.team==="red"?PI:0,heroYaw:me&&me.team==="red"?0:PI,vy:0,grounded:true,jumps:0,superT:0,sprintT:0,sprintCD:0,manualT:0,lastKind:null,sliding:false});
   $("#screen").hidden=true;$("#ctfHud").hidden=false;$("#controls").hidden=false;$("#count").textContent="";G.playing=true;snapCam();
   if(mid&&me){me.c.position.set(mid[0],mid[1],mid[2]);me.c.rotation.y=mid[3];G.heroYaw=mid[3];snapCam();toast(`🔄 You’re in! You’re playing ${me.name} on the ${TNAME[me.team]} team.`,3200);return}
-  if(me)toast(`You’re ${me.name} on the ${TNAME[me.team]} team in ${MAPS[mi].e} ${MAPS[mi].name}! Grab their flag and bring it back. First to 3 wins! 🚩`,4400);
+  if(isHost())startPlantTurn("blue");
 }
 function hideGame(){
+  $("#plantBar").hidden=true;$("#plantBtn").hidden=true;
   $("#pipBox").hidden=true;
   C.replay=null;$("#replayBar").hidden=true;$("#carView").hidden=true;HIST.length=0;
   G.playing=false;C.phase="off";C.me=-1;units.forEach(u=>{u.c.visible=false});Object.values(flags).forEach(f=>{f.mesh.visible=false;f.ring.visible=false;f.home=null});
@@ -860,6 +905,7 @@ function onHostMsg(id,m){
   else if(m.t==="vote"){if(m.m>=0&&m.m<MAPS.length)pl.vote=m.m;pushLobby()}
   else if(m.t==="in"){const u=units.find(x=>x.human===id);if(u&&!u.mustReturn&&!(u.ignoreNetT>0))u.net=m}
   else if(m.t==="act"&&m.k==="help"){callHelp(units.find(x=>x.human===id))}
+  else if(m.t==="act"&&m.k==="plant"){requestPlant(units.find(x=>x.human===id))}
 }
 function freeBotSeat(){const held=new Set(Object.values(NET.left).map(o=>o.idx)),cnt={blue:0,red:0};units.forEach(u=>{if(u.human)cnt[u.team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const pass of [0,1])for(const tm of order){const u=units.find(x=>x.team===tm&&!x.human&&(pass||!held.has(x.i)));if(u)return u.i}return -1}
 function sendFull(id){const c=NET.conns[id];if(c){try{c.send({t:"full"})}catch(e){}setTimeout(()=>c.close(),300)}}
@@ -873,9 +919,9 @@ function hostHello(id,m){
   const look=old&&old.idx===idx?old.look:null,back=!!(old&&old.idx===idx);delete NET.left[key];
   NET.players.push({id,name:nm,idx,vote:-1,look});
   const u=units[idx];u.human=id;u.pname=nm;u.tagR=1.5;u.net=null;u.ignoreNetT=.8;if(look)applyLook(u,look);setLabel(u);
-  broadcast({t:"seat",idx,id,name:nm,look});
+  fixRoles();broadcast({t:"seat",idx,id,name:nm,look});
   const c=NET.conns[id],pos=u.c.position;
-  if(c&&c.open)c.send({t:"start",mid:true,map:curMap,fl:[[flags.blue.home.x,flags.blue.home.z],[flags.red.home.x,flags.red.home.z]],
+  if(c&&c.open)c.send({t:"start",mid:true,map:curMap,fl:null,
     assign:units.filter(x=>x.human).map(x=>({id:x.human,name:x.pname,idx:x.i,look:(NET.players.find(p=>p.id===x.human)||{}).look||null})),me:[pos.x,pos.y,pos.z,u.c.rotation.y]});
   NET.snapT=0;
   notifyAll({k:"toast",m:back?`🔄 ${nm} is back and took over ${u.name} again!`:`👋 ${nm} joined the game as ${u.name}!`,ms:2600});
@@ -887,7 +933,7 @@ function dropPlayer(id){
   NET.left[gone.name.toLowerCase()]={idx:gone.idx,look:gone.look||null};
   NET.players=NET.players.filter(p=>p.id!==id);delete NET.conns[id];
   const u=units.find(x=>x.human===id);
-  if(u&&G.playing){const nm=u.pname||u.name;u.human=null;u.pname="";u.net=null;u.tagR=ROSTER[u.i].tagR||1.15;setLabel(u);broadcast({t:"seat",idx:u.i,id:null,name:"",look:null});notifyAll({k:"toast",m:`👋 ${nm} dropped out. The computer is playing ${u.name} until they come back.`,ms:2800})}
+  if(u&&G.playing){const nm=u.pname||u.name;u.human=null;u.pname="";u.net=null;u.tagR=ROSTER[u.i].tagR||1.15;setLabel(u);fixRoles();broadcast({t:"seat",idx:u.i,id:null,name:"",look:null});notifyAll({k:"toast",m:`👋 ${nm} dropped out. The computer is playing ${u.name} until they come back.`,ms:2800})}
   pushLobby();
 }
 
@@ -1039,7 +1085,7 @@ const joy={id:null,ox:0,oy:0,x:0,y:0};
 addEventListener("keydown",e=>{if(e.target&&(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"))return;const k=e.key.toLowerCase();keys[k]=true;
   if(G.playing&&(k===" "||k.startsWith("arrow")))e.preventDefault();
   if(k===" "&&!e.repeat){jumpQueued=true;jumpHeld=true}
-  if(k==="shift")sprint();if(k==="e")askHelp()});
+  if(k==="shift")sprint();if(k==="e"){if(C.phase==="plant")askPlant();else askHelp()}});
 addEventListener("keyup",e=>{const k=e.key.toLowerCase();keys[k]=false;if(k===" ")jumpHeld=false});
 addEventListener("blur",()=>{Object.keys(keys).forEach(k=>keys[k]=false);jumpHeld=false});
 let camDrag=null;
@@ -1059,6 +1105,7 @@ jb.addEventListener("pointerdown",e=>{e.preventDefault();audioOn();jumpQueued=tr
 ["pointerup","pointercancel","pointerleave"].forEach(ev=>jb.addEventListener(ev,()=>{jumpHeld=false;jb.classList.remove("down")}));
 $("#sprintBtn").addEventListener("pointerdown",e=>{e.preventDefault();sprint()});
 $("#helpBtn").addEventListener("pointerdown",e=>{e.preventDefault();askHelp()});
+$("#plantBtn").addEventListener("click",e=>{e.preventDefault();askPlant()});
 document.addEventListener("contextmenu",e=>e.preventDefault());
 
 /* ---------- camera & main loop ---------- */
@@ -1093,6 +1140,10 @@ function frame(){
   ctf.ff.material.opacity=.18+Math.sin(t*4)*.07;ctf.ffBars.forEach((b,i)=>b.position.y=(t*2+i*3)%9);
   $("#joyHint").hidden=!G.playing;$("#kbHint").hidden=!G.playing;
   if(ED.mesh){ED.mesh.rotation.y+=dt*.5;camera.position.set(0,2.6,80.5);camera.lookAt(0,-.4,75)}
+  else if(G.playing&&(C.phase==="view"||(C.phase==="plant"&&C.lead&&C.lead[C.plantTeam]!==C.me))){
+    let fx,fz,fy;if(C.phase==="view"){const f=flags[C.viewTeam];fx=f.home?f.home.x:0;fz=f.home?f.home.z:0;fy=ground(fx,fz)}else{const lp=units[C.lead[C.plantTeam]].c.position;fx=lp.x;fz=lp.z;fy=lp.y}
+    const s=(C.phase==="view"?C.viewTeam:C.plantTeam)==="blue"?1:-1,hgt=C.phase==="view"?16+Math.max(0,C.viewT-1)*6:26;
+    const ct=new THREE.Vector3(fx,fy+hgt,fz+s*hgt*.45);camPos.lerp(ct,Math.min(1,3*dt));camera.position.copy(camPos);camera.lookAt(fx,fy,fz)}
   else if(G.playing&&C.replay){const R=C.replay,w=units[R.who].c.position,a=R.ang+R.t*.35,ct=new THREE.Vector3(w.x+Math.sin(a)*9,w.y+5.5,w.z+Math.cos(a)*9);camPos.lerp(ct,Math.min(1,5*dt));camera.position.copy(camPos);camera.lookAt(w.x,w.y+1.5,w.z)}
   else if(G.playing&&MEU()&&MEU().riding){const c=COP[MEU().team],cs=Math.sin(c.ry),cc=Math.cos(c.ry),gy=ground(c.x,c.z),bob=Math.sin(t*9)*.03;
     camera.position.set(c.x+cc*.45-cs*.95,gy+1.72+bob,c.z-cs*.45+cc*-.95);camera.lookAt(c.x+cs*8+cc*.1,gy+1.4,c.z+cc*8-cs*.1);camPos.copy(camera.position)}
