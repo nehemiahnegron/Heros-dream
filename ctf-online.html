@@ -406,6 +406,7 @@ const ROSTER=[
   {name:"Ivy",team:"red",look:KID[4],role:"rescue",speed:7.8},
   {name:"Leo",team:"red",look:KID[5],role:"attack",speed:7.8}];
 const HUMAN_SPEED=9;
+const tIdx=i=>ROSTER[i].team==="blue"?i:i-ROSTER.filter(r=>r.team==="blue").length;
 const units=[];
 const looksEq=(a,b)=>JSON.stringify(a||null)===JSON.stringify(b||null);
 function baseLook(i){return JSON.parse(JSON.stringify(ROSTER[i].look))}
@@ -429,6 +430,7 @@ function applyLook(u,look){
   FIELD.add(c);u.c=c;u.look=look;u.lbl=null;setLabel(u);
 }
 ROSTER.forEach((r,i)=>{const u={i,team:r.team,name:r.name,role:r.role,baseRole:r.role,speed:r.speed,tagR:r.tagR||1.15,lora:!!r.lora,human:null,pname:"",look:null,c:null,think:0,tx:0,tz:0,ang:Math.random()*6,vy:0};applyLook(u,null);u.c.visible=false;units.push(u)});
+let LU=units;
 
 /* ---------- game state ---------- */
 const powerups=[];let puId=0;
@@ -478,7 +480,7 @@ function decide(u){
   const my=flags[u.team],en=flags[enemyTeam];
   const ux=u.c.position.x,uz=lz(u),onEnemy=!ownSide(u);
   const set=(x,z)=>{u.tx=clampX(x);u.tz=z};u.wantSprint=false;
-  const enemies=units.filter(e=>e.team!==u.team&&!e.jailed);
+  const enemies=LU.filter(e=>e.team!==u.team&&!e.jailed);
   if(C.phase!=="play"){
     if(u.role==="defend"&&my.home){const a=u.ang;set(my.home.x+Math.cos(a)*3.5,my.home.z+Math.sin(a)*3.5);return}
     set(ux,s*(u.role==="guard"?30:6));return;
@@ -490,9 +492,9 @@ function decide(u){
   if(my.dropped&&["defend","intercept"].includes(u.role)){set(my.x,my.z);u.wantSprint=true;return}
   const intruders=enemies.filter(e=>(u.team==="blue"?lz(e)>0:lz(e)<0)&&!safe(e));
   const [ni,nd]=nearestOf(intruders,ux,uz);
-  let role=u.role;const prisoners=units.filter(m=>m.team===u.team&&m.jailed);
+  let role=u.role;const prisoners=LU.filter(m=>m.team===u.team&&m.jailed);
   if(role==="rescue"&&!prisoners.length)role="attack";
-  if(prisoners.length>=2&&(role==="attack"||role==="intercept")&&!units.some(m=>m.team===u.team&&!m.jailed&&!m.human&&m.baseRole==="rescue"))role="rescue";
+  if(prisoners.length>=2&&(role==="attack"||role==="intercept")&&!LU.some(m=>m.team===u.team&&!m.jailed&&!m.human&&m.baseRole==="rescue"))role="rescue";
   if(role==="attack"&&!onEnemy&&u.waitT>0){set(ux+Math.sin(nowT+u.ang)*3,s*3);return}
   if(ni&&nd<7&&role!=="attack"&&role!=="rescue"){set(ni.c.position.x,lz(ni));u.wantSprint=nd<5;return}
   if(role==="defend"){const h=my.home;if(ni&&Math.hypot(ni.c.position.x-h.x,lz(ni)-h.z)<16){set(ni.c.position.x,lz(ni));u.wantSprint=true;return}u.ang+=.5;set(h.x+Math.cos(u.ang)*4,h.z+Math.sin(u.ang)*4);return}
@@ -523,25 +525,25 @@ function copPath(tm){const j=JAIL[tm],sg=Math.sign(j.x),sx=sg*28,s=tm==="blue"?1
 function callCop(tm){const c=COP[tm];if(c.st!=="idle")return;const p=copPath(tm);Object.assign(c,{st:"toJail",x:p.start[0],z:p.start[1],ry:Math.PI,path:p.toJail.slice(),t:0,riders:[]})}
 function copArrive(tm,c){
   const s=tm==="blue"?1:-1;
-  if(c.st==="toJail"){c.st="load";c.t=1.8;const rs=units.filter(u=>u.team===tm&&u.mustReturn&&!u.riding);rs.forEach(u=>{u.boarding=true;notify(u,{k:"toast",m:"🚔 Your ride is here! Hop in the back…",ms:2000,snd:[880,660,880,660]})});c.riders=rs}
+  if(c.st==="toJail"){c.st="load";c.t=1.8;const rs=LU.filter(u=>u.team===tm&&u.mustReturn&&!u.riding);rs.forEach(u=>{u.boarding=true;notify(u,{k:"toast",m:"🚔 Your ride is here! Hop in the back…",ms:2000,snd:[880,660,880,660]})});c.riders=rs}
   else if(c.st==="home"){c.st="drop";c.t=1;
     c.riders.forEach((u,k)=>{u.riding=false;u.mustReturn=false;const sg=Math.sign(c.x);const x=c.x-sg*(2.2+(k%3)*1.1),z=c.z+(Math.floor(k/3)*1.3-.6)*s;
       u.c.position.set(x,ground(x,z),z);u.c.rotation.y=-sg*Math.PI/2;u.vy=8;u.immuneT=1.5;u.ignoreNetT=.6;u.think=0;u.waitT=1+Math.random()*2;
       notify(u,{k:"booted",x,z,ry:-sg*Math.PI/2})});
     c.riders=[];}
-  else if(c.st==="away"){c.st="idle";if(units.some(u=>u.team===tm&&u.mustReturn&&!u.riding))callCop(tm)}
+  else if(c.st==="away"){c.st="idle";if(LU.some(u=>u.team===tm&&u.mustReturn&&!u.riding))callCop(tm)}
 }
 function copUpdate(dt){
   ["blue","red"].forEach(tm=>{const c=COP[tm];if(c.st==="idle")return;
     if(c.st==="load"){const sg=Math.sign(c.x),dx=c.x-sg*1.4,dz=c.z;c.riders.forEach((u,k)=>{if(u.riding)return;const p=u.c.position,ex=dx-p.x,ez=dz+(k%2?.6:-.6)-p.z,d=Math.hypot(ex,ez);if(d>.15){const st=Math.min(d,5.5*dt);p.x+=ex/d*st;p.z+=ez/d*st;p.y=ground(p.x,p.z);u.c.rotation.y=Math.atan2(ex,ez);animChar(u.c,1,nowT,dt)}else if(c.t<.6){u.riding=true;u.boarding=false}})}
-    if(c.st==="load"||c.st==="drop"){c.t-=dt;if(c.t<=0){if(c.st==="load")c.riders.forEach(u=>{u.riding=true;u.boarding=false;notify(u,{k:"toast",m:"🚔 Officer Pat: Buckle up! Back to your side we go.",ms:3000})});c.st=c.st==="load"?"home":"away";c.path=copPath(tm)[c.st].slice()}}
+    if(c.st==="load"||c.st==="drop"){c.t-=dt;if(c.t<=0){if(c.st==="load")c.riders.forEach(u=>{u.riding=true;u.boarding=false;notify(u,{k:"toast",m:"🚔 Buckle up! The cop car is driving you back to your side.",ms:3000})});c.st=c.st==="load"?"home":"away";c.path=copPath(tm)[c.st].slice()}}
     else{const w=c.path[0];if(w){const dx=w[0]-c.x,dz=w[1]-c.z,d=Math.hypot(dx,dz),sp=(c.st==="home"?13:20)*dt;if(d>.01)c.ry=Math.atan2(dx,dz);
       if(d<=sp){c.x=w[0];c.z=w[1];c.path.shift();if(!c.path.length)copArrive(tm,c)}else{c.x+=dx/d*sp;c.z+=dz/d*sp}}}
     c.riders.forEach(u=>{if(u.riding)u.c.position.set(c.x,ground(c.x,c.z)+.4,c.z)});
   });
 }
 const HIST=[];let histT=0,gameClock=0;
-function recordHist(dt){gameClock+=dt;histT-=dt;if(histT>0)return;histT=.1;HIST.push({t:gameClock,p:units.map(u=>{const q=u.c.position;return [r2(q.x),r2(q.y),r2(q.z),r2(u.c.rotation.y),u.riding?0:1]})});while(HIST.length&&HIST[0].t<gameClock-14)HIST.shift()}
+function recordHist(dt){gameClock+=dt;histT-=dt;if(histT>0)return;histT=.1;HIST.push({t:gameClock,p:units.map(u=>{const q=u.c.position;return [r2(q.x),r2(q.y),r2(q.z),r2(u.c.rotation.y),u.riding||u.out?0:1]})});while(HIST.length&&HIST[0].t<gameClock-14)HIST.shift()}
 function startReplay(u,f,over){
   const from=Math.max((f.grabT||gameClock-8)-.6,gameClock-10);let fr=HIST.filter(h=>h.t>=from).map(h=>h.p);
   if(fr.length<2)fr=[units.map(x=>{const q=x.c.position;return [q.x,q.y,q.z,x.c.rotation.y,1]}),units.map(x=>{const q=x.c.position;return [q.x,q.y,q.z,x.c.rotation.y,1]})];
@@ -566,15 +568,15 @@ function resetPoint(){
   Object.values(flags).forEach(f=>{f.carrier=null;f.dropped=false;f.dropT=0;f.x=f.home.x;f.z=f.home.z});
   ["blue","red"].forEach(tm=>Object.assign(COP[tm],{st:"idle",riders:[],path:[]}));
   let bi=0,ri=0;
-  units.forEach(u=>{Object.assign(u,{jailed:false,mustReturn:false,riding:false,immuneT:0,shieldT:0,frozenT:0,speedT:0,forceT:0,sprintT:0,sprintCD:0,carrying:null,think:0,waitT:1+Math.random()*4,stuckT:0,vy:0,role:u.baseRole,net:null,ignoreNetT:.8});
+  LU.forEach(u=>{Object.assign(u,{jailed:false,mustReturn:false,riding:false,immuneT:0,shieldT:0,frozenT:0,speedT:0,forceT:0,sprintT:0,sprintCD:0,carrying:null,think:0,waitT:1+Math.random()*4,stuckT:0,vy:0,role:u.baseRole,net:null,ignoreNetT:.8});
     const lp=linePos(u,u.team==="blue"?bi++:ri++);u.c.position.set(lp.x,ground(lp.x,lp.z),lp.z);confine(u);u.c.position.y=ground(u.c.position.x,u.c.position.z);u.c.rotation.y=u.team==="blue"?PI:0;u.tx=lp.x;u.tz=lp.z;
     notify(u,{k:"reset",x:u.c.position.x,z:u.c.position.z})});
   C.phase="count";C.countT=4;
 }
 /* ---------- flag planting: each team lead plants, everyone watches from above ---------- */
-function fixRoles(){["blue","red"].forEach(tm=>{const bots=units.filter(u=>u.team===tm&&!u.human);bots.forEach(u=>{u.baseRole=ROSTER[u.i].role;if(u.forceT<=0)u.role=u.baseRole});
+function fixRoles(){["blue","red"].forEach(tm=>{const bots=LU.filter(u=>u.team===tm&&!u.human);bots.forEach(u=>{u.baseRole=ROSTER[u.i].role;if(u.forceT<=0)u.role=u.baseRole});
   ["defend","defend","rescue"].forEach((need,k)=>{const have=bots.filter(u=>u.baseRole===need).length,want=need==="defend"?(bots.length>=4?2:1):1;if(have>=want||bots.length<3)return;const pick=bots.find(u=>u.baseRole==="attack"||u.baseRole==="intercept");if(pick){pick.baseRole=need;pick.role=need}})})}
-function teamLead(tm){const h=units.filter(u=>u.team===tm&&u.human);return (h.length?h[0]:units.find(u=>u.team===tm)).i}
+function teamLead(tm){const h=LU.filter(u=>u.team===tm&&u.human);return (h.length?h[0]:LU.find(u=>u.team===tm)).i}
 function plantOK(tm,x,z){const s=tm==="blue"?1:-1;if(z*s<12)return "Too close to the middle! Go deeper into your side 🏃";const j=JAIL[enemyOf(tm)];if(Math.hypot(x-j.x,z-j.z)<7)return "Not in the jail! Pick another spot 🔒";if(topRect(x,z))return "Put it on the ground, not on a ramp or slide 🛝";if(bushes.some(b=>Math.hypot(x-b[0],z-b[1])<2.2))return "Too close to that bush, step away a little";return null}
 function nearestOK(tm,x,z){if(!plantOK(tm,x,z))return [x,z];for(let r=1;r<40;r++)for(let a=0;a<16;a++){const nx=clampX(x+Math.cos(a/16*PI*2)*r),nz=Math.max(-44,Math.min(44,z+Math.sin(a/16*PI*2)*r));if(!plantOK(tm,nx,nz))return [nx,nz]}const sp=FLAG_SPOTS[0],s=tm==="blue"?1:-1;return [sp[0]*s,sp[1]*s]}
 function startPlantTurn(tm){C.phase="plant";C.plantTeam=tm;C.plantT=10;C.botT=null;const lu=units[C.lead[tm]];
@@ -591,16 +593,16 @@ function plantLoop(dt){
 }
 function tagUnit(v,by){
   if(v.carrying){const f=v.carrying;f.carrier=null;f.dropped=true;f.dropT=8;f.x=v.c.position.x;f.z=lz(v);v.carrying=null}
-  v.jailed=true;v.mustReturn=false;v.riding=false;const j=JAIL[v.team];const n=units.filter(m=>m.team===v.team&&m.jailed).length-1;const a=n*1.05;
+  v.jailed=true;v.mustReturn=false;v.riding=false;const j=JAIL[v.team];const n=LU.filter(m=>m.team===v.team&&m.jailed).length-1;const a=n*1.05;
   v.jx=j.x+Math.cos(a)*1.7;v.jz=j.z+Math.sin(a)*1.7;v.c.position.set(v.jx,ground(v.jx,v.jz),v.jz);v.vy=0;v.shieldT=0;v.speedT=0;v.sprintT=0;v.net=null;
   notify(v,{k:"jailed",x:v.jx,z:v.jz,by:by.name});
   notify(by,{k:"toast",m:`You tagged ${v.name}! Off to jail 🔒`,ms:2000,snd:[988,1319]});
-  units.forEach(u=>{if(u.human&&u!==v&&u!==by)notify(u,{k:"toast",m:`${by.name} tagged ${v.name} 🔒`,ms:1500})});
+  LU.forEach(u=>{if(u.human&&u!==v&&u!==by)notify(u,{k:"toast",m:`${by.name} tagged ${v.name} 🔒`,ms:1500})});
 }
 function tags(){
   const canTag=u=>u.frozenT<=0&&!u.mustReturn;
-  for(const a of units){if(a.team!=="blue"||a.jailed)continue;
-    for(const b of units){if(b.team!=="red"||b.jailed||a.jailed)continue;
+  for(const a of LU){if(a.team!=="blue"||a.jailed)continue;
+    for(const b of LU){if(b.team!=="red"||b.jailed||a.jailed)continue;
       if(Math.abs(a.c.position.y-b.c.position.y)>1.6||airH(a)>1.4||airH(b)>1.4)continue;
       const d=distU(a,b);
       if(lz(a)<0&&d<b.tagR&&canTag(b)&&!safe(a))tagUnit(a,b);
@@ -609,31 +611,31 @@ function tags(){
 }
 function jailbreaks(){
   ["blue","red"].forEach(tm=>{
-    const pris=units.filter(u=>u.team===tm&&u.jailed);if(!pris.length)return;
-    const j=JAIL[tm];const r=units.find(u=>u.team===tm&&!u.jailed&&!u.mustReturn&&Math.hypot(u.c.position.x-j.x,lz(u)-j.z)<3.4);if(!r)return;
+    const pris=LU.filter(u=>u.team===tm&&u.jailed);if(!pris.length)return;
+    const j=JAIL[tm];const r=LU.find(u=>u.team===tm&&!u.jailed&&!u.mustReturn&&Math.hypot(u.c.position.x-j.x,lz(u)-j.z)<3.4);if(!r)return;
     pris.forEach(p=>{p.jailed=false;p.mustReturn=true;p.riding=false;p.net=null;p.sprintT=0;
       notify(p,{k:"toast",m:`💵 ${r.name} paid your bail! 🚔 Wait for the cop car to drive you back to your side.`,ms:3800,snd:[659,880,1175]})});
     notifyAll({k:"bail",x:j.x,z:j.z});
     notify(r,{k:"toast",m:"💵 You paid bail! Your teammates ride home in the cop car. Keep sneaking, but you can still get tagged!",ms:3200});
-    units.forEach(u=>{if(!u.human||u===r||pris.includes(u))return;notify(u,{k:"toast",m:u.team===tm?`💵 ${r.name} paid bail for your teammates!`:`😤 ${r.name} paid bail for the ${TNAME[tm]} team!`,ms:2200})});
+    LU.forEach(u=>{if(!u.human||u===r||pris.includes(u))return;notify(u,{k:"toast",m:u.team===tm?`💵 ${r.name} paid bail for your teammates!`:`😤 ${r.name} paid bail for the ${TNAME[tm]} team!`,ms:2200})});
     callCop(tm);
   });
 }
 function returnFlag(f,by){f.dropped=false;f.carrier=null;f.x=f.home.x;f.z=f.home.z;if(by)toastTeam(f.team,"🚩 Your flag is safe back home!",1800)}
-function toastTeam(tm,m,ms,snd){units.forEach(u=>{if(u.human&&u.team===tm)notify(u,{k:"toast",m,ms,snd})})}
+function toastTeam(tm,m,ms,snd){LU.forEach(u=>{if(u.human&&u.team===tm)notify(u,{k:"toast",m,ms,snd})})}
 function flagLogic(dt){
   Object.values(flags).forEach(f=>{
     if(f.carrier){const u=f.carrier;f.x=u.c.position.x;f.z=lz(u);if(ownSide(u))capture(u,f);return}
     if(f.dropped){f.dropT-=dt;if(f.dropT<=0){returnFlag(f,null);return}}
     const fy=ground(f.x,f.z);
-    for(const u of units){
+    for(const u of LU){
       if(u.jailed||u.mustReturn||Math.abs(u.c.position.y-fy)>2.2)continue;
       if(Math.hypot(u.c.position.x-f.x,lz(u)-f.z)>1.5)continue;
       if(u.team===f.team){if(f.dropped)returnFlag(f,u);continue}
       if(u.carrying)continue;
       f.carrier=u;f.dropped=false;u.carrying=f;f.grabT=gameClock;
       notify(u,{k:"toast",m:`🚩 You got the ${TNAME[f.team]} flag! Run back to your side!`,ms:2600,snd:[784,988,1175]});
-      units.forEach(o=>{if(!o.human||o===u)return;notify(o,{k:"toast",m:o.team===u.team?`🚩 ${u.name} grabbed the ${TNAME[f.team]} flag! Go go go!`:`⚠️ ${u.name} took your flag! Tag them before they cross!`,ms:2400,snd:o.team===u.team?null:[392,330]})});
+      LU.forEach(o=>{if(!o.human||o===u)return;notify(o,{k:"toast",m:o.team===u.team?`🚩 ${u.name} grabbed the ${TNAME[f.team]} flag! Go go go!`:`⚠️ ${u.name} took your flag! Tag them before they cross!`,ms:2400,snd:o.team===u.team?null:[392,330]})});
       break;
     }
   });
@@ -642,7 +644,7 @@ function capture(u,f){
   C.score[u.team]++;u.carrying=null;u.waitT=3+Math.random()*3;returnFlag(f,null);
   const sc=`🔵 ${C.score.blue} – ${C.score.red} 🔴`;
   const over=C.score[u.team]>=3,more="";
-  units.forEach(o=>{if(!o.human)return;const mine=o.team===u.team;notify(o,{k:"cap",win:mine,m:(mine?`🎉 ${o===u?"You":u.name} captured the ${TNAME[f.team]} flag! ${sc}`:`😤 ${u.name} captured your flag. ${sc}`)+more})});
+  LU.forEach(o=>{if(!o.human)return;const mine=o.team===u.team;notify(o,{k:"cap",win:mine,m:(mine?`🎉 ${o===u?"You":u.name} captured the ${TNAME[f.team]} flag! ${sc}`:`😤 ${u.name} captured your flag. ${sc}`)+more})});
   startReplay(u,f,over);
 }
 function makePUMesh(type){const g=new THREE.Group();g.add(M(new THREE.OctahedronGeometry(.55),basic(type.c)));const s=label(type.e,"#FFFFFF");s.scale.set(2,.5,1);s.position.y=1.1;g.add(s);FIELD.add(g);return g}
@@ -654,19 +656,19 @@ function spawnPU(){
 function applyPU(u,type){
   if(type.k==="speed")u.speedT=6;
   else if(type.k==="shield")u.shieldT=7;
-  else if(type.k==="freeze"){units.forEach(e=>{if(e.team!==u.team&&!e.jailed&&distU(e,u)<12){e.frozenT=3;notify(e,{k:"toast",m:`❄️ ${u.name} froze you!`,ms:1800})}})}
+  else if(type.k==="freeze"){LU.forEach(e=>{if(e.team!==u.team&&!e.jailed&&distU(e,u)<12){e.frozenT=3;notify(e,{k:"toast",m:`❄️ ${u.name} froze you!`,ms:1800})}})}
   else if(type.k==="jump"){if(u.human)notify(u,{k:"super"});else u.speedT=4}
   notify(u,{k:"toast",m:type.msg,ms:2200,snd:[1047,1319,1568]});
 }
 function powerupLogic(dt){
   C.puT-=dt;if(C.puT<=0&&powerups.length<4){C.puT=8;spawnPU()}
   for(let i=powerups.length-1;i>=0;i--){const p=powerups[i];
-    for(const u of units){if(u.jailed)continue;if(Math.hypot(u.c.position.x-p.x,u.c.position.z-p.z)<1.4&&Math.abs(u.c.position.y+1-p.obj.position.y)<2.4){applyPU(u,p.type);FIELD.remove(p.obj);powerups.splice(i,1);break}}}
+    for(const u of LU){if(u.jailed)continue;if(Math.hypot(u.c.position.x-p.x,u.c.position.z-p.z)<1.4&&Math.abs(u.c.position.y+1-p.obj.position.y)<2.4){applyPU(u,p.type);FIELD.remove(p.obj);powerups.splice(i,1);break}}}
 }
 function callHelp(u){
   if(!u||C.phase!=="play")return;
   if(u.helpCD>0){notify(u,{k:"toast",m:"Your team is already on the way! 📣"});return}
-  const mates=units.filter(m=>m.team===u.team&&!m.human&&!m.jailed&&!m.mustReturn).sort((a,b)=>distU(a,u)-distU(b,u)).slice(0,2);
+  const mates=LU.filter(m=>m.team===u.team&&!m.human&&!m.jailed&&!m.mustReturn).sort((a,b)=>distU(a,u)-distU(b,u)).slice(0,2);
   if(!mates.length){notify(u,{k:"toast",m:"No computer teammates free to help right now 😬"});return}
   u.helpCD=10;const role=u.jailed?"rescue":"attack";mates.forEach(m=>{m.role=role;m.forceT=12;m.think=0});
   notify(u,{k:"toast",m:u.jailed?`📣 ${mates.map(m=>m.name).join(" and ")} are coming to break you out!`:`📣 ${mates.map(m=>m.name).join(" and ")}: charge their flag!`,ms:2600,snd:[659,784]});
@@ -679,12 +681,12 @@ function endCTF(){
 /* ---------- host loop ---------- */
 function hostUpdate(dt,t){
   if(C.replay){replayUpdate(dt);return}
-  units.forEach(u=>{["immuneT","shieldT","frozenT","speedT","forceT","helpCD"].forEach(k=>{if(u[k]>0)u[k]=Math.max(0,u[k]-dt)});
+  LU.forEach(u=>{["immuneT","shieldT","frozenT","speedT","forceT","helpCD"].forEach(k=>{if(u[k]>0)u[k]=Math.max(0,u[k]-dt)});
     if(!u.human){if(u.forceT<=0)u.role=u.baseRole;if(u.sprintT>0){u.sprintT-=dt;if(u.sprintT<=0){u.sprintT=0;u.sprintCD=3}}else if(u.sprintCD>0)u.sprintCD=Math.max(0,u.sprintCD-dt)}});
   if(C.phase==="plant"||C.phase==="view")plantLoop(dt);
   if(C.phase==="count"){C.countT-=dt;if(C.countT<=0){C.countT=0;C.phase="play";notifyAll({k:"go"})}}
   if(C.phase==="play"){C.time-=dt;if(C.time<=0){C.time=0;endCTF()}}
-  units.forEach(u=>{
+  LU.forEach(u=>{
     if(!u.human){if(C.phase==="over")animChar(u.c,0,t,dt);else if(C.phase==="plant"&&C.lead[C.plantTeam]===u.i){}else aiUnit(u,dt);return}
     if(u.i===C.me)return;
     if(u.ignoreNetT>0)u.ignoreNetT-=dt;
@@ -726,7 +728,7 @@ function clientUpdate(dt,t){
   if(C.phase==="view")C.viewT=Math.max(0,C.viewT-dt);
   if(C.phase==="play")C.time=Math.max(0,C.time-dt);
   ["blue","red"].forEach(tm=>{const c=COP[tm];if(c.st==="idle"||c.tx===undefined)return;const k=Math.min(1,dt*10);c.x+=(c.tx-c.x)*k;c.z+=(c.tz-c.z)*k;c.ry=lerpAngle(c.ry,c.try,k)});
-  units.forEach(u=>{if((u.i===C.me&&!u.mustReturn)||!u.tgt)return;
+  LU.forEach(u=>{if((u.i===C.me&&!u.mustReturn)||!u.tgt)return;
     const p=u.c.position,g=u.tgt,k=Math.min(1,dt*10),mv=Math.hypot(g.x-p.x,g.z-p.z);
     if(mv>6)p.set(g.x,g.y,g.z);else{p.x+=(g.x-p.x)*k;p.y+=(g.y-p.y)*k;p.z+=(g.z-p.z)*k}
     u.c.rotation.y=lerpAngle(u.c.rotation.y,g.ry,k);animChar(u.c,u.frozenT>0?0:Math.min(1,mv*2.5),t*(u.sprintT>0?1.35:1),dt)});
@@ -780,7 +782,7 @@ function visuals(dt,t){
     f.mesh.userData.cloth.rotation.y=Math.sin(t*3)*.25;if(f.mesh.scale.x<1)f.mesh.scale.setScalar(Math.min(1,f.mesh.scale.x+dt*2.5))});
   ["blue","red"].forEach(tm=>{const c=COP[tm],m=copCars[tm];m.g.visible=c.st!=="idle";if(!m.g.visible)return;m.g.position.set(c.x,ground(c.x,c.z),c.z);m.g.rotation.y=c.ry;const on=Math.sin(t*14)>0;m.rl.visible=on;m.bl.visible=!on;m.wheels.forEach(w=>w.rotation.x+=dt*12)});
   cashUpdate(dt);
-  units.forEach(u=>{if(!C.replay)u.c.visible=!u.riding;u.shield.visible=u.shieldT>0||u.immuneT>0;u.ice.visible=u.frozenT>0;u.homeS.visible=!!u.mustReturn&&!u.jailed;u.jailbird.visible=!!(u.jailed||u.mustReturn);
+  units.forEach(u=>{if(!C.replay)u.c.visible=!u.riding&&!u.out;u.shield.visible=u.shieldT>0||u.immuneT>0;u.ice.visible=u.frozenT>0;u.homeS.visible=!!u.mustReturn&&!u.jailed;u.jailbird.visible=!!(u.jailed||u.mustReturn);
     u.dust.visible=(u.i===C.me?G.sprintT>0:u.sprintT>0)&&!u.jailed;if(u.dust.visible)u.dust.material.opacity=.55+Math.sin(t*22)*.35;if(u.lbl)u.lbl.visible=u.i!==C.me});
   powerups.forEach((q,i)=>{q.obj.rotation.y+=dt*2;q.obj.position.y=ground(q.x,q.z)+1.2+Math.sin(t*3+i)*.25});
 }
@@ -808,7 +810,7 @@ function hud(){
   const el=$("#ctfStatus");if(el.textContent!==st)el.textContent=st;
   const meTxt=`You: ${me.name} ${me.team==="blue"?"🔵":"🔴"} · ${MAPS[curMap].e} ${MAPS[curMap].name}${NET.mode!=="solo"?` · 🌐 ${NET.code}`:""}`;if($("#ctfMe").textContent!==meTxt)$("#ctfMe").textContent=meTxt;
   $("#redTint").classList.toggle("on",C.phase==="play"&&!ownSide(me)&&!me.jailed&&!me.mustReturn);
-  $("#carView").hidden=!(me.riding&&!C.replay);
+  $("#carView").hidden=true;
   const sb=$("#sprintBtn");sb.style.setProperty("--cd",G.sprintT>0?0:(G.sprintCD/3).toFixed(3));sb.classList.toggle("go",G.sprintT>0);sb.setAttribute("aria-disabled",G.sprintCD>0||me.frozenT>0||me.jailed);
   $("#jumpBtn").setAttribute("aria-disabled",me.frozenT>0);$("#helpBtn").setAttribute("aria-disabled",C.phase!=="play");
   const cnt=$("#count");
@@ -817,7 +819,7 @@ function hud(){
 }
 
 /* ---------- network ---------- */
-const NET={left:{},mode:"solo",peer:null,conns:{},hostConn:null,myId:"host",code:"",players:[],inT:0,snapT:0,cfg:{mapMode:"vote",map:0},lobby:null};
+const NET={left:{},mode:"solo",peer:null,conns:{},hostConn:null,myId:"host",code:"",players:[],inT:0,snapT:0,cfg:{mapMode:"vote",map:0,teamSize:7},lobby:null};
 const isHost=()=>NET.mode!=="client";
 function sendHost(msg){if(isHost())onHostMsg(NET.myId,msg);else if(NET.hostConn&&NET.hostConn.open)NET.hostConn.send(msg)}
 function broadcast(msg){Object.values(NET.conns).forEach(c=>{if(c.open)try{c.send(msg)}catch(e){}})}
@@ -855,24 +857,26 @@ function pickFlags(mi){const sp=MAPS[mi].flagSpots,b=sp[Math.floor(Math.random()
 function tally(L){const v=[0,0,0,0];L.players.forEach(p=>{if(p.vote>=0&&p.vote<MAPS.length)v[p.vote]++});return v}
 function leadingMap(L){const c=L.cfg||NET.cfg;if(c.mapMode==="host")return c.map;const v=tally(L),mx=Math.max(...v);if(mx===0)return c.map;return v.indexOf(mx)}
 function pickMap(){const c=NET.cfg;if(c.mapMode==="host")return c.map;const v=tally({players:NET.players}),mx=Math.max(...v);if(mx===0)return c.map;const tied=v.map((n,i)=>n===mx?i:-1).filter(i=>i>=0);return tied[Math.floor(Math.random()*tied.length)]}
-function freeSeat(){const cnt={blue:0,red:0};NET.players.forEach(p=>{if(p.idx>=0)cnt[ROSTER[p.idx].team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const tm of order){const i=ROSTER.findIndex((r,k)=>r.team===tm&&!NET.players.some(p=>p.idx===k));if(i>=0)return i}return -1}
+function freeSeat(){const cnt={blue:0,red:0};NET.players.forEach(p=>{if(p.idx>=0)cnt[ROSTER[p.idx].team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const tm of order){const i=ROSTER.findIndex((r,k)=>r.team===tm&&tIdx(k)<(NET.cfg.teamSize||7)&&!NET.players.some(p=>p.idx===k));if(i>=0)return i}return -1}
 function hostStart(){
   NET.players.forEach(p=>{if(p.idx<0)p.idx=freeSeat()});
   const mi=pickMap(),fl=null;
   const assign=NET.players.filter(p=>p.idx>=0).map(p=>({id:p.id,name:p.name,idx:p.idx,look:p.look||null}));
-  broadcast({t:"start",assign,fl,map:mi});startMatch(assign,fl,mi);
+  const size=NET.cfg.teamSize||7;broadcast({t:"start",assign,fl,map:mi,size});startMatch(assign,fl,mi,null,size);
 }
-function startMatch(assign,fl,mi,mid){
+function startMatch(assign,fl,mi,mid,size){
+  size=Math.max(1,Math.min(7,size||7));C.size=size;
+  units.forEach(u=>{u.out=tIdx(u.i)>=size});LU=units.filter(u=>!u.out);
   if(ED.mesh)closeEditor(true);
   buildMap(mi);
   units.forEach(u=>{u.human=null;u.pname="";u.net=null;u.tgt=null});
   assign.forEach(a=>{const u=units[a.idx];if(!u)return;u.human=a.id;u.pname=a.name;applyLook(u,a.look)});
-  units.forEach(u=>{if(!u.human)applyLook(u,null);u.tagR=u.human?1.5:(ROSTER[u.i].tagR||1.15);setLabel(u);u.c.visible=true});
+  units.forEach(u=>{if(!u.human)applyLook(u,null);u.tagR=u.human?1.5:(ROSTER[u.i].tagR||1.15);setLabel(u);u.c.visible=!u.out});
   C.me=units.findIndex(u=>u.human===NET.myId);
   Object.assign(C,{phase:"plant",plantTeam:"blue",plantT:10,viewTeam:"blue",viewT:0,botT:null,countT:0,time:240,score:{blue:0,red:0},puT:5,lead:{blue:teamLead("blue"),red:teamLead("red")}});
   fixRoles();
   let bi=0,ri=0;
-  units.forEach(u=>{Object.assign(u,{jailed:false,mustReturn:false,riding:false,ignoreNetT:0,immuneT:0,shieldT:0,frozenT:0,speedT:0,forceT:0,helpCD:0,sprintT:0,sprintCD:0,role:u.baseRole,carrying:null,think:0,waitT:2+Math.random()*5,stuckT:0,vy:0,wantSprint:false});
+  units.forEach(u=>{if(u.out){u.c.position.set(0,-60,0);Object.assign(u,{jailed:false,mustReturn:false,riding:false,carrying:null});return}Object.assign(u,{jailed:false,mustReturn:false,riding:false,ignoreNetT:0,immuneT:0,shieldT:0,frozenT:0,speedT:0,forceT:0,helpCD:0,sprintT:0,sprintCD:0,role:u.baseRole,carrying:null,think:0,waitT:2+Math.random()*5,stuckT:0,vy:0,wantSprint:false});
     const lp=linePos(u,u.team==="blue"?bi++:ri++),x=lp.x,z=lp.z;u.c.position.set(x,ground(x,z),z);confine(u);u.c.position.y=ground(u.c.position.x,u.c.position.z);u.c.rotation.y=u.team==="blue"?PI:0;u.tx=x;u.tz=z});
   ["blue","red"].forEach(tm=>Object.assign(COP[tm],{st:"idle",riders:[],path:[],tx:undefined}));
   Object.values(flags).forEach(f=>{f.home=null;f.carrier=null;f.dropped=false;f.mesh.visible=false;f.ring.visible=false});
@@ -900,19 +904,19 @@ function onHostMsg(id,m){
   const pl=NET.players.find(p=>p.id===id);
   if(m.t==="hello"){if(pl){pushLobby();return}hostHello(id,m);return}
   if(!pl)return;
-  if(m.t==="pick"){if(!G.playing&&!NET.players.some(p=>p.idx===m.idx&&p.id!==id)&&m.idx>=0&&m.idx<ROSTER.length){pl.idx=m.idx;pl.look=m.look?cleanLook(m.look):null}pushLobby()}
+  if(m.t==="pick"){if(!G.playing&&!NET.players.some(p=>p.idx===m.idx&&p.id!==id)&&m.idx>=0&&m.idx<ROSTER.length&&tIdx(m.idx)<(NET.cfg.teamSize||7)){pl.idx=m.idx;pl.look=m.look?cleanLook(m.look):null}pushLobby()}
   else if(m.t==="look"){if(m.idx===pl.idx&&m.look)pl.look=cleanLook(m.look);if(m.name)pl.name=String(m.name).slice(0,10);pushLobby()}
   else if(m.t==="vote"){if(m.m>=0&&m.m<MAPS.length)pl.vote=m.m;pushLobby()}
   else if(m.t==="in"){const u=units.find(x=>x.human===id);if(u&&!u.mustReturn&&!(u.ignoreNetT>0))u.net=m}
   else if(m.t==="act"&&m.k==="help"){callHelp(units.find(x=>x.human===id))}
   else if(m.t==="act"&&m.k==="plant"){requestPlant(units.find(x=>x.human===id))}
 }
-function freeBotSeat(){const held=new Set(Object.values(NET.left).map(o=>o.idx)),cnt={blue:0,red:0};units.forEach(u=>{if(u.human)cnt[u.team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const pass of [0,1])for(const tm of order){const u=units.find(x=>x.team===tm&&!x.human&&(pass||!held.has(x.i)));if(u)return u.i}return -1}
+function freeBotSeat(){const held=new Set(Object.values(NET.left).map(o=>o.idx)),cnt={blue:0,red:0};LU.forEach(u=>{if(u.human)cnt[u.team]++});const order=cnt.blue<=cnt.red?["blue","red"]:["red","blue"];for(const pass of [0,1])for(const tm of order){const u=LU.find(x=>x.team===tm&&!x.human&&(pass||!held.has(x.i)));if(u)return u.i}return -1}
 function sendFull(id){const c=NET.conns[id];if(c){try{c.send({t:"full"})}catch(e){}setTimeout(()=>c.close(),300)}}
 function hostHello(id,m){
   const nm=String(m.name||"Player").slice(0,10),key=nm.toLowerCase(),old=NET.left[key];
   if(NET.players.length>=14){sendFull(id);return}
-  if(!G.playing){const idx=old&&!NET.players.some(p=>p.idx===old.idx)?old.idx:freeSeat();NET.players.push({id,name:nm,idx,vote:-1,look:old?old.look:null});delete NET.left[key];pushLobby();return}
+  if(!G.playing){const idx=old&&!NET.players.some(p=>p.idx===old.idx)&&tIdx(old.idx)<(NET.cfg.teamSize||7)?old.idx:freeSeat();if(idx<0){sendFull(id);return}NET.players.push({id,name:nm,idx,vote:-1,look:old?old.look:null});delete NET.left[key];pushLobby();return}
   // a game is going: take back your own player if the computer is still playing it, otherwise any computer seat
   const idx=old&&units[old.idx]&&!units[old.idx].human?old.idx:freeBotSeat();
   if(idx<0){sendFull(id);return}
@@ -921,7 +925,7 @@ function hostHello(id,m){
   const u=units[idx];u.human=id;u.pname=nm;u.tagR=1.5;u.net=null;u.ignoreNetT=.8;if(look)applyLook(u,look);setLabel(u);
   fixRoles();broadcast({t:"seat",idx,id,name:nm,look});
   const c=NET.conns[id],pos=u.c.position;
-  if(c&&c.open)c.send({t:"start",mid:true,map:curMap,fl:null,
+  if(c&&c.open)c.send({t:"start",mid:true,size:C.size||7,map:curMap,fl:null,
     assign:units.filter(x=>x.human).map(x=>({id:x.human,name:x.pname,idx:x.i,look:(NET.players.find(p=>p.id===x.human)||{}).look||null})),me:[pos.x,pos.y,pos.z,u.c.rotation.y]});
   NET.snapT=0;
   notifyAll({k:"toast",m:back?`🔄 ${nm} is back and took over ${u.name} again!`:`👋 ${nm} joined the game as ${u.name}!`,ms:2600});
@@ -968,7 +972,7 @@ function joinGame(){
 function netErr(e){return e.type==="peer-unavailable"?"No game found with that code. Check the code and try again.":e.type==="network"||e.type==="server-error"||e.type==="socket-error"?"Can’t reach the game server. Check your internet and try again.":e.type==="browser-incompatible"?"This browser can’t play online. Try Chrome or Safari.":"Something went wrong connecting. Try again."}
 function onClientMsg(m){
   if(m.t==="lobby"){NET.lobby=m;if(NET.inLobby&&!G.playing&&!ED.mesh)renderLobby()}
-  else if(m.t==="start"){NET.inLobby=false;startMatch(m.assign,m.fl,m.map,m.mid?m.me:null)}
+  else if(m.t==="start"){NET.inLobby=false;startMatch(m.assign,m.fl,m.map,m.mid?m.me:null,m.size||7)}
   else if(m.t==="seat"){const u=units[m.idx];if(u){u.human=m.id||null;u.pname=m.name||"";u.net=null;if(m.look)applyLook(u,m.look);else if(!m.id)applyLook(u,null);setLabel(u)}}
   else if(m.t==="s")applySnap(m);
   else if(m.t==="ev")handleEv(m);
@@ -976,20 +980,23 @@ function onClientMsg(m){
   else if(m.t==="full")netStatus("That game is full or already playing. Try again after this round.");
 }
 function hostLeft(){if(NET.mode!=="client")return;leave();toast("You got disconnected. Tap 🔑 Join to hop back in as your player!",4500)}
-function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}Object.assign(NET,{mode:"solo",peer:null,conns:{},hostConn:null,myId:"host",code:"",players:[],inLobby:false,lobby:null,cfg:{mapMode:"vote",map:0}});if(ED.mesh)closeEditor(true);hideGame();showMenu()}
-function playSolo(){Object.assign(NET,{mode:"solo",myId:"host",code:"",inLobby:true,cfg:{mapMode:"host",map:NET.cfg.map||0},players:[{id:"host",name:myName(),idx:0,vote:-1,look:loadLook(0)}]});renderLobby()}
+function leave(){try{if(NET.peer)NET.peer.destroy()}catch(e){}Object.assign(NET,{mode:"solo",peer:null,conns:{},hostConn:null,myId:"host",code:"",players:[],inLobby:false,lobby:null,cfg:{mapMode:"vote",map:0,teamSize:7}});if(ED.mesh)closeEditor(true);hideGame();showMenu()}
+function playSolo(){Object.assign(NET,{mode:"solo",myId:"host",code:"",inLobby:true,cfg:{mapMode:"host",map:NET.cfg.map||0,teamSize:NET.cfg.teamSize||7},players:[{id:"host",name:myName(),idx:0,vote:-1,look:loadLook(0)}]});renderLobby()}
 function curLobby(){return NET.mode==="client"?NET.lobby:{players:NET.players,code:NET.code,cfg:NET.cfg}}
 function renderLobby(){
   const L=curLobby();if(!L)return;
   const mine=L.players.find(p=>p.id===NET.myId)||{};const host=isHost();
   const seat=i=>{const r=ROSTER[i],owner=L.players.find(p=>p.idx===i),me=owner&&owner.id===NET.myId;return `<button class="charbtn ${r.team}${me?" mine":""}" data-pick="${i}" ${owner&&!me?"disabled":""}><b>${r.name}</b><span>${me?"⭐ You":owner?esc(owner.name):"🤖 Computer"}</span></button>`};
-  const team=tm=>ROSTER.map((r,i)=>r.team===tm?seat(i):"").join("");
+  const cfg0=L.cfg||NET.cfg,size=cfg0.teamSize||7;
+  const team=tm=>ROSTER.map((r,i)=>r.team===tm&&tIdx(i)<size?seat(i):"").join("");
+  const sizeUI=`<h2>👥 Players per team: ${size} vs ${size}</h2>`+(host?`<div class="ed-chips gtype">${[1,2,3,4,5,6,7].map(n=>`<button data-tsize="${n}" class="${n===size?"on":""}">${n}</button>`).join("")}</div>`:"")+`<p class="who">${host?"Fewer per team = a smaller, faster game. ":""}Empty spots on a team are played by the computer.</p>`;
   const head=NET.mode==="solo"?`<h1>Play solo</h1><p>Pick your character and a map. The computer plays everyone else.</p>`:`<h1>Code: <span class="code">${L.code}</span></h1><p>Friends tap “Join” and type this number.</p><div class="row2"><button class="ghostbtn" id="inviteBtn">📤 Share invite link</button></div>`;
   const cfg=L.cfg||NET.cfg,votes=tally(L),lead=leadingMap(L),solo=NET.mode==="solo";
   const modeChips=host&&!solo?`<div class="ed-chips gtype"><button data-mapmode="vote" class="${cfg.mapMode==="vote"?"on":""}">🗳️ Everyone votes</button><button data-mapmode="host" class="${cfg.mapMode==="host"?"on":""}">👑 I pick</button></div>`:"";
   const mapNote=solo?"":cfg.mapMode==="vote"?"Tap a map to vote. Most votes wins (a tie is picked at random).":host?"You’re picking the map.":"The host is picking the map.";
   const maps=MAPS.map((mp,i)=>{const on=cfg.mapMode==="vote"&&!solo?mine.vote===i:cfg.map===i;return `<button class="mapbtn${on?" on":""}${i===lead?" lead":""}" data-map="${i}"><span class="me">${mp.e}</span><b>${mp.name}</b><span>${mp.blurb}</span>${cfg.mapMode==="vote"&&!solo?`<i>${votes[i]?`🗳️ ${votes[i]}`:""}${i===lead&&votes[i]?" ⭐":""}</i>`:i===cfg.map?"<i>✅ Picked</i>":""}</button>`}).join("");
   showScreen(`<span class="script byline">Capture the Flag Online</span>${head}
+  ${sizeUI}
   <h2>Pick your character</h2><p class="who">🔵 Blue team</p><div class="chargrid">${team("blue")}</div><p class="who">🔴 Red team</p><div class="chargrid">${team("red")}</div>
   ${mine.idx>=0?`<div class="row2"><button class="big" id="editBtn" style="background:#8E6CFF;box-shadow:0 6px 0 #6B3FD1">✏️ Edit my avatar</button></div>`:""}
   <h2>🗺️ Map</h2>${modeChips}<p class="who">${mapNote}</p><div class="mapgrid">${maps}</div>
@@ -1003,7 +1010,7 @@ function showMenu(){
   let nm="";try{nm=localStorage.getItem("hsName")||""}catch(e){}
   let q=(new URLSearchParams(location.search).get("join")||"").replace(/\D/g,"").slice(0,3);if(!q)try{q=localStorage.getItem("ctfCode")||""}catch(e){}
   const online=!!window.Peer;
-  showScreen(`<span class="script byline">by Lola 🩵</span><h1>Capture the Flag</h1><p>7 🔵 blue vs 7 🔴 red, online with family and friends!</p>
+  showScreen(`<span class="script byline">by Lola 🩵</span><h1>Capture the Flag</h1><p>🔵 Blue vs 🔴 red, up to 7 on each team, online with family and friends!</p>
   <input class="field" id="nameIn" maxlength="10" placeholder="Your name" value="${esc(nm)}">
   <button class="big" id="hostBtn">🏠 Create a game</button>
   <div class="row2 joinrow"><input class="field code" id="codeIn" maxlength="3" inputmode="numeric" pattern="[0-9]*" placeholder="123" value="${esc(q)}"><button class="big" id="joinBtn" style="background:#3FA7E8;box-shadow:0 6px 0 #2577AE">🔑 Join</button></div>
@@ -1022,6 +1029,7 @@ document.addEventListener("click",e=>{
     if(NET.mode==="solo"||(isHost()&&cfg.mapMode==="host")){NET.cfg.map=i;pushLobby();renderLobby()}
     else if(cfg.mapMode==="vote")sendHost({t:"vote",m:i});
     else toast("The host is picking the map 👑",1800);return}
+  const ts=t.closest("[data-tsize]");if(ts&&isHost()){NET.cfg.teamSize=+ts.dataset.tsize;NET.players.forEach(p=>{if(p.idx>=0&&tIdx(p.idx)>=NET.cfg.teamSize)p.idx=-1});NET.players.forEach(p=>{if(p.idx<0)p.idx=freeSeat()});pushLobby();renderLobby();return}
   const mm=t.closest("[data-mapmode]");if(mm&&isHost()){NET.cfg.mapMode=mm.dataset.mapmode;if(NET.cfg.mapMode==="host")NET.cfg.map=leadingMap({players:NET.players,cfg:{mapMode:"vote",map:NET.cfg.map}});pushLobby();renderLobby();return}
   if(t.closest("#startBtn")){audioOn();NET.inLobby=false;hostStart();return}
   if(t.closest("#againBtn")){audioOn();hostStart();return}
@@ -1124,8 +1132,8 @@ function pipRender(dt,t){
   const want=new THREE.Vector3(c.x-cs*7+cc*3.5,gy+4.2,c.z-cc*7-cs*3.5);
   if(pipTeam!==tm){pipPos.copy(want);pipTeam=tm}else pipPos.lerp(want,Math.min(1,4*dt));
   pipCam.position.copy(pipPos);pipCam.lookAt(c.x,gy+1,c.z);
-  const riders=units.filter(u=>u.team===tm&&u.mustReturn).map(u=>u.name);
-  const txt=(riders.length?riders.join(" & "):"The cop car")+(riders.some(n=>units.find(u=>u.name===n).riding)?" riding home 🚔":" getting picked up 🚔");
+  const riders=LU.filter(u=>u.team===tm&&u.mustReturn).map(u=>u.name);
+  const txt=(riders.length?riders.join(" & "):"The cop car")+(riders.some(n=>LU.find(u=>u.name===n).riding)?" riding home 🚔":" getting picked up 🚔");
   if(box.hidden)box.hidden=false;if($("#pipText").textContent!==txt)$("#pipText").textContent=txt;
   const r=box.getBoundingClientRect();if(!r.width)return;
   const x=r.left+4,w=r.width-8,h=r.height-8,y=innerHeight-(r.top+4)-h;
@@ -1145,8 +1153,7 @@ function frame(){
     const s=(C.phase==="view"?C.viewTeam:C.plantTeam)==="blue"?1:-1,hgt=C.phase==="view"?16+Math.max(0,C.viewT-1)*6:26;
     const ct=new THREE.Vector3(fx,fy+hgt,fz+s*hgt*.45);camPos.lerp(ct,Math.min(1,3*dt));camera.position.copy(camPos);camera.lookAt(fx,fy,fz)}
   else if(G.playing&&C.replay){const R=C.replay,w=units[R.who].c.position,a=R.ang+R.t*.35,ct=new THREE.Vector3(w.x+Math.sin(a)*9,w.y+5.5,w.z+Math.cos(a)*9);camPos.lerp(ct,Math.min(1,5*dt));camera.position.copy(camPos);camera.lookAt(w.x,w.y+1.5,w.z)}
-  else if(G.playing&&MEU()&&MEU().riding){const c=COP[MEU().team],cs=Math.sin(c.ry),cc=Math.cos(c.ry),gy=ground(c.x,c.z),bob=Math.sin(t*9)*.03;
-    camera.position.set(c.x+cc*.45-cs*.95,gy+1.72+bob,c.z-cs*.45+cc*-.95);camera.lookAt(c.x+cs*8+cc*.1,gy+1.4,c.z+cc*8-cs*.1);camPos.copy(camera.position)}
+  else if(G.playing&&MEU()&&MEU().riding){const c=COP[MEU().team],gy=ground(c.x,c.z),ct=new THREE.Vector3(c.x-Math.sin(c.ry)*9+Math.cos(c.ry)*2,gy+5,c.z-Math.cos(c.ry)*9-Math.sin(c.ry)*2);camPos.lerp(ct,Math.min(1,4*dt));camera.position.copy(camPos);camera.lookAt(c.x,gy+1.2,c.z)}
   else if(G.playing&&MEU()&&MEU().mustReturn&&COP[MEU().team].st!=="idle"){const c=COP[MEU().team],p=MEU().c.position,dx=c.x-p.x,dz=c.z-p.z,d=Math.hypot(dx,dz)||1,ct=new THREE.Vector3(p.x-dx/d*7,p.y+4.5,p.z-dz/d*7);camPos.lerp(ct,Math.min(1,4*dt));camera.position.copy(camPos);camera.lookAt((p.x+c.x)/2,p.y+1.5,(p.z+c.z)/2)}
   else if(G.playing&&MEU()){const ct=camTarget();camPos.lerp(ct,Math.min(1,6*dt));const gy=ground(camPos.x,camPos.z)+1.5;if(camPos.y<gy)camPos.y=gy;camera.position.copy(camPos);const p=MEU().c.position;camera.lookAt(p.x,p.y+2,p.z)}
   else{const a=t*.08;camera.position.set(Math.sin(a)*58,30,Math.cos(a)*58);camera.lookAt(0,0,0)}
