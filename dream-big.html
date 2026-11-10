@@ -3494,7 +3494,7 @@ function tap(cx,cy){const r=canvas.getBoundingClientRect();ndc.set((cx-r.left)/r
 const RZ0=-34,RZ1=10,RRISE=6.8;function rampY(x,z){return (x>39.3&&x<50.7&&z<RZ1+.5&&z>RZ0)?RRISE*clamp((z-RZ0)/(RZ1-RZ0),0,1):0;}
 const inRamp=(x,z)=>x>39.3&&x<50.7&&z>-41.5&&z<RZ1+.5;
 function carBlocked(x,z){if(car.level==='street'){if(inFP(P,x,z,-2.4)&&!(x>40&&x<50&&z<RZ1+.5))return true;return isWater(x,z)||Math.hypot(x,z)>1500;}
-  if(!inFP(P,x,z,2.6)||(x>-40&&x<-26&&z>-28&&z<-16))return true;if(inRamp(x,z)&&z<RZ1-1.5)return true;
+  if(!inFP(P,x,z,2.6)||(x>-40&&x<-26&&z>-28&&z<-16))return true;
   for(const s of SPACES)if(s.occ&&s!==car.space&&Math.abs(x-s.x)<1.75&&Math.abs(z-s.z)<3)return true;return false;}
 function driveUpdate(dt){const inp=input();if(wheelSt.id===null&&Math.abs(wheelSt.ang)>.001){wheelSt.ang-=Math.sign(wheelSt.ang)*Math.min(Math.abs(wheelSt.ang),dt*7);wheelSt.face.style.transform=`rotate(${wheelSt.ang}rad)`;}
   const thr=clamp(pedalSt.v+inp.y,-1,1),steerIn=clamp(wheelSt.ang/(TAU*1.25)*1.6+inp.x,-1,1),maxV=car.level==='garage'?5:13;
@@ -3859,15 +3859,51 @@ function end(){
 seek.addEventListener('pointerdown',()=>{dragging=true;if(!run)start();});
 seek.addEventListener('pointerup',()=>{dragging=false;});
 seek.addEventListener('input',e=>{if(!run)start();t0=performance.now()-(+e.target.value/1000)*DUR*1000;drive();});
-/* ---------- site clean-up: remove the dark brown base slab, open the east ground-floor wall beside the ramp ---------- */
+/* ---------- ramp lane rebuild: open the east side, remove the ceilings the car would hit, clear lane clutter ---------- */
+W.scene.updateMatrixWorld(true);
+const replaceGeom=(mesh,pick)=>{
+  const g=mesh.geometry,p=g.attributes.position,uv=g.attributes.uv,np=[],nu=[];
+  const A=new THREE.Vector3(),B=new THREE.Vector3(),C=new THREE.Vector3(),N=new THREE.Vector3(),T=new THREE.Vector3();
+  for(let i=0;i<p.count;i+=3){
+    A.set(p.getX(i),p.getY(i),p.getZ(i));B.set(p.getX(i+1),p.getY(i+1),p.getZ(i+1));C.set(p.getX(i+2),p.getY(i+2),p.getZ(i+2));
+    N.subVectors(B,A).cross(T.subVectors(C,A));
+    if(pick(A,B,C,N)) continue;
+    for(let k=i;k<i+3;k++){np.push(p.getX(k),p.getY(k),p.getZ(k));if(uv)nu.push(uv.getX(k),uv.getY(k));}
+  }
+  const ng=new THREE.BufferGeometry();ng.setAttribute('position',new THREE.Float32BufferAttribute(np,3));
+  if(uv)ng.setAttribute('uv',new THREE.Float32BufferAttribute(nu,2));ng.computeVertexNormals();mesh.geometry=ng;
+};
 W.scene.traverse(o=>{
-  if(!o.isMesh||!o.material||!o.material.color) return;
+  if(!o.isMesh||!o.visible||o.isInstancedMesh||!o.geometry||!o.material||!o.material.color) return;
   o.geometry.computeBoundingBox();const bb=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
   const hex=o.material.color.getHexString();
   // dark brown base slab under the whole site
-  if(hex==='7a7066'&&bb.max.y<0&&(bb.max.x-bb.min.x)>100){o.visible=false;}
-  // east ground-floor wall beside the entrance ramp: open it so you can drive straight in
-  if(hex==='2f404b'&&bb.min.x>50&&bb.max.x<54&&bb.min.y<1&&bb.max.y<7){o.visible=false;}
+  if(hex==='7a7066'&&bb.max.y<0&&(bb.max.x-bb.min.x)>100){o.visible=false;return;}
+  // garage body: open the whole east side of the ramp lane, and remove the deck underside above the ramp
+  if(hex==='c7c3bb'&&bb.min.y<7.5&&bb.max.y>15&&(bb.max.x-bb.min.x)>100){
+    const yw=o.position.y;
+    replaceGeom(o,(A,B,C,N)=>{
+      const nl=N.length()||1,ux=Math.abs(N.x)/nl;
+      const x0=Math.min(A.x,B.x,C.x),x1=Math.max(A.x,B.x,C.x),y0=Math.min(A.y,B.y,C.y)+yw,y1=Math.max(A.y,B.y,C.y)+yw,z0=Math.min(A.z,B.z,C.z),z1=Math.max(A.z,B.z,C.z);
+      const eastWall=ux>0.5&&x1>50.2&&x0<54.8&&y1>6.4&&y0<20.5&&z1>-40.6&&z0<11.6;
+      const deckUnder=(y0>6.9&&y1<7.1)&&x1>39.0&&x0<51.0&&z1>-41.6&&z0<10.8;
+      return eastWall||deckUnder;
+    });
+    // walkable garage floor (faces up, invisible from underneath)
+    const fl=new THREE.Mesh(new THREE.PlaneGeometry(108,80).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0xf5f4f0,roughness:.9}));
+    fl.position.set(0,7.02,0);fl.receiveShadow=true;W.scene.add(fl);
+    return;
+  }
+  // the east ground-floor wall stays
+  if(hex==='2f404b') return;
+  // lane clutter: ceiling slabs over the ramp, gates, posts, headers, bollards and inner walls
+  const inLane=bb.max.x>39.2&&bb.min.x<50.8&&bb.max.z>-41.6&&bb.min.z<10.6;
+  if(!inLane) return;
+  if(o.geometry.type==='PlaneGeometry') return;            // painted lines and arrows
+  if(hex==='1f2225') return;                                // the ramp itself
+  if(bb.min.y>6.5) return;                                  // roofs and upper decks stay
+  if(bb.min.y>=4.5&&bb.max.y<=7.6&&(bb.max.x-bb.min.x)>20){o.visible=false;return;} // grey and brown ceilings
+  o.visible=false;
 });
 const prevTick=W.tick;
 W.tick=function(dt){
